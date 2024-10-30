@@ -16,6 +16,10 @@ class Table:
         return (f"Table {self.table_id} with capacity {self.capacity} "
                 f"is reserved: {self.is_reserved} by {self.user_name}")
 
+    @property
+    def readable_booking_time(self) -> str:
+        return self.booking_time.strftime("%d.%m %H:%M")
+
 
 class TablesStorage:
 
