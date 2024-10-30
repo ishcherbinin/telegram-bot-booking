@@ -47,12 +47,13 @@ async def process_seats(message: types.Message, state: FSMContext):
     _logger.info("Processing request for number of seats")
     seats = message.text
     if not seats.isdigit():
-        await message.answer("Please enter a valid number.")
+        await message.answer("Please enter a valid number. Number should be digit")
         await state.set_state(OrderStates.waiting_for_seats)
         return
     seats = int(seats)
     _logger.info(f"User requested table for {seats} seats")
     table = tables_storage.search_for_table(seats)
+    await state.set_data({"table": table})
     if not table:
         await message.answer("Sorry, we don't have a table for this number of seats")
         await state.set_state(OrderStates.waiting_for_seats)
@@ -69,7 +70,8 @@ async def process_name(message: types.Message, state: FSMContext):
     _logger.info(f"User name: {name}")
     global CURRENT_TABLE
     CURRENT_TABLE.user_name = name
-    await message.answer("Please provide time you want to book the table for. Format: YYYY-MM-DD HH:MM")
+    await message.answer("Please provide time you want to book the table for. Format: MM-DD HH:MM")
+    await message.answer("NOTE. Booking will be kept only for 1 hour after time you provided")
     await state.set_state(OrderStates.waiting_for_time)
 
 @ds.message(OrderStates.waiting_for_time)
@@ -77,9 +79,9 @@ async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
     time = message.text
     try:
-        booking_time = datetime.strptime(time, "%Y-%m-%d %H:%M")
+        booking_time = datetime.strptime(time, "%m-%d %H:%M")
     except ValueError:
-        await message.answer("Please enter a valid date and time in the format YYYY-MM-DD HH:MM")
+        await message.answer("Please enter a valid date and time in the format MM-DD HH:MM")
         await state.set_state(OrderStates.waiting_for_time)
         return
     _logger.info(f"Booking time: {booking_time}")
@@ -94,7 +96,7 @@ async def process_time(message: types.Message, state: FSMContext):
 async def process_confirmation(message: types.Message, state: FSMContext):
     _logger.info("Processing confirmation")
     global CURRENT_TABLE
-    table = CURRENT_TABLE
+    table = state.get_data()
     confirmation = message.text.upper()
     if confirmation == "YES":
         CURRENT_TABLE.is_reserved = True
@@ -111,8 +113,11 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
     _logger.info(f"Sending booking detail to separate chat {group_chat_id}")
     user = message.from_user.username
     await bot.send_message(chat_id=group_chat_id,
-                     text=f"User: @{user} "
-                          f"Request: \n{table}")
+                     text=f"\nUser: @{user} "
+                          f"\nTable №: {table},"
+                          f"\nNumber of seats: {table.capacity},"
+                          f"\nBooking time: {table.booking_time},"
+                          f"\nUser name: {table.user_name}")
 
 async def main():
     try:
