@@ -1,5 +1,6 @@
 import csv
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 
@@ -8,6 +9,7 @@ class Table:
     table_id: int
     capacity: int
     is_reserved: bool = False
+    booking_time: datetime = None
     user_name: str = None
 
     def __str__(self):
