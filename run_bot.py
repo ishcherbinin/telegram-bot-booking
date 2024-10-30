@@ -58,8 +58,7 @@ async def process_seats(message: types.Message, state: FSMContext):
         await message.answer("Sorry, we don't have a table for this number of seats")
         await state.set_state(OrderStates.waiting_for_seats)
         return
-    global CURRENT_TABLE
-    CURRENT_TABLE = table
+    await state.update_data({"table": table})
     await message.answer("Please provide name you want to book the table for")
     await state.set_state(OrderStates.waiting_for_name)
 
@@ -68,8 +67,9 @@ async def process_name(message: types.Message, state: FSMContext):
     _logger.info("Processing user name")
     name = message.text
     _logger.info(f"User name: {name}")
-    global CURRENT_TABLE
-    CURRENT_TABLE.user_name = name
+    data = await state.get_data()
+    table = data["table"]
+    table.user_name = name
     await message.answer("Please provide time you want to book the table for. Format: DD.MM HH:MM")
     await message.answer("NOTE. Booking will be kept only for 1 hour after time you provided")
     await state.set_state(OrderStates.waiting_for_time)
@@ -85,25 +85,26 @@ async def process_time(message: types.Message, state: FSMContext):
         await state.set_state(OrderStates.waiting_for_time)
         return
     _logger.info(f"Booking time: {booking_time}")
-    global CURRENT_TABLE
-    CURRENT_TABLE.booking_time = booking_time
-    await message.answer(f"Table for {CURRENT_TABLE.capacity} seats for "
-                         f"{CURRENT_TABLE.user_name} at {CURRENT_TABLE.readable_booking_time}")
+    data = await state.get_data()
+    table = data["table"]
+    table.booking_time = booking_time
+    await message.answer(f"Table for {table.capacity} seats for "
+                         f"{table.user_name} at {table.readable_booking_time}")
     await message.answer("Please confirm the booking. Answer Yes/No")
     await state.set_state(OrderStates.waiting_for_confirmation)
 
 @ds.message(OrderStates.waiting_for_confirmation)
 async def process_confirmation(message: types.Message, state: FSMContext):
     _logger.info("Processing confirmation")
-    global CURRENT_TABLE
-    table = CURRENT_TABLE
+    data = await state.get_data()
+    table = data["table"]
     confirmation = message.text.upper()
     if confirmation == "YES":
-        CURRENT_TABLE.is_reserved = True
+        table.is_reserved = True
         await message.answer(f"Table {table.table_id} for {table.capacity} "
                              f"seats is booked for {table.user_name} at {table.readable_booking_time}")
         await message.answer("Table is booked. Manager will contact you soon to confirm booking")
-        await send_request_to_chat(message, CURRENT_TABLE)
+        await send_request_to_chat(message, table)
     else:
         await message.answer("Booking is rejected")
         await state.set_state(OrderStates.waiting_for_seats)
@@ -113,7 +114,7 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
     _logger.info(f"Sending booking detail to separate chat {group_chat_id}")
     user = message.from_user.username
     await bot.send_message(chat_id=group_chat_id,
-                     text=f"\nUser: @{user} "
+                     text=f"\nUser name: {user} "
                           f"\nTable №: {table.table_id},"
                           f"\nNumber of seats: {table.capacity},"
                           f"\nBooking time: {table.readable_booking_time},"
