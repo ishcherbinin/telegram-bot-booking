@@ -1,5 +1,6 @@
+import csv
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, Optional, Tuple
 
 
 @dataclass(repr=True)
@@ -16,7 +17,7 @@ class Table:
 
 class TablesStorage:
 
-    def __init__(self, available_tables: List[Dict[str, str]]):
+    def __init__(self, available_tables: Tuple[Dict[str, str], ...]):
         self._tables: Dict[str, Table] = {
             table["table_number"]: Table(table_id=int(table["table_number"]), capacity=int(table["capacity"]))
             for table in available_tables
@@ -32,3 +33,11 @@ class TablesStorage:
             if table.capacity >= capacity and not table.is_reserved:
                 return table
         return None
+
+    @classmethod
+    def from_csv_file(cls, file_path: str) -> 'TablesStorage':
+        with open(file_path, 'r') as file:
+            reader = csv.DictReader(file)
+            available_tables = tuple(row for row in reader)
+        return cls(available_tables)
+
