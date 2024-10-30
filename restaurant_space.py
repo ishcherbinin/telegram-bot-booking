@@ -23,6 +23,11 @@ class TablesStorage:
         }
 
     def search_for_table(self, capacity: int) -> Optional[Table]:
+        """
+        Search for a table with a given capacity which is not reserved
+        :param capacity:
+        :return:
+        """
         for table in self._tables.values():
             if table.capacity >= capacity and not table.is_reserved:
                 return table

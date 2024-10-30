@@ -23,3 +23,4 @@ def test_search_for_table(tables_storage: TablesStorage, table: Table):
     assert tables_storage.search_for_table(4) == table, "Table with capacity 4 should be found"
     assert tables_storage.search_for_table(5) is None, "Table with capacity 5 should not be found"
     assert tables_storage.search_for_table(2) in [Table(table_id=2, capacity=2), table], "Table with capacity 2 or 4 is suitable"
+
