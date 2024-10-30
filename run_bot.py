@@ -107,13 +107,12 @@ async def process_confirmation(message: types.Message, state: FSMContext):
         await state.set_state(OrderStates.waiting_for_seats)
     await state.clear()
 
-def send_request_to_chat(message: types.Message, table: Table) -> types.Message:
+async def send_request_to_chat(message: types.Message, table: Table) -> None:
     _logger.info(f"Sending booking detail to separate chat {group_chat_id}")
-    user = message.from_user
-    bot.send_message(chat_id=group_chat_id,
+    user = message.from_user.username
+    await bot.send_message(chat_id=group_chat_id,
                      text=f"User: @{user} "
                           f"Request: \n{table}")
-    return message
 
 async def main():
     try:
