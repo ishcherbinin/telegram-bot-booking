@@ -16,7 +16,6 @@ logging.config.dictConfig(log_config)
 
 _logger = logging.getLogger(__name__)
 
-
 # assign environment variables to variables
 api_token = os.getenv("TELEGRAM_API_TOKEN")
 
@@ -31,6 +30,7 @@ bot = Bot(token=api_token)
 
 ds = Dispatcher()
 
+
 # Define the FSM states for each step
 class OrderStates(StatesGroup):
     waiting_for_seats = State()
@@ -43,10 +43,12 @@ class OrderStates(StatesGroup):
 class ManagerStates(StatesGroup):
     waiting_for_date_manager = State()
 
+
 """
 This part defines client oriented part which might be used by account to book table in the restaurant
 Open chat with bot and type /book-table to start booking process
 """
+
 
 @ds.message(Command("book-table"))
 async def book_table(message: types.Message, state: FSMContext):
@@ -54,6 +56,7 @@ async def book_table(message: types.Message, state: FSMContext):
     _logger.debug(message)
     await message.answer("Please provide date you want to reserve table for. Format: DD.MM")
     await state.set_state(OrderStates.waiting_for_date_client)
+
 
 @ds.message(OrderStates.waiting_for_date_client)
 async def process_date(message: types.Message, state: FSMContext):
@@ -91,6 +94,7 @@ async def process_seats(message: types.Message, state: FSMContext):
     await message.answer("Please provide name you want to book the table for")
     await state.set_state(OrderStates.waiting_for_name)
 
+
 @ds.message(OrderStates.waiting_for_name)
 async def process_name(message: types.Message, state: FSMContext):
     _logger.info("Processing user name")
@@ -102,6 +106,7 @@ async def process_name(message: types.Message, state: FSMContext):
     await message.answer("Please provide time you want to book the table for. Format: HH:MM")
     await message.answer("NOTE. Booking will be kept only for 1 hour after time you provided")
     await state.set_state(OrderStates.waiting_for_time)
+
 
 @ds.message(OrderStates.waiting_for_time)
 async def process_time(message: types.Message, state: FSMContext):
@@ -121,6 +126,7 @@ async def process_time(message: types.Message, state: FSMContext):
     await message.answer("Please confirm the booking. Answer Yes/No")
     await state.set_state(OrderStates.waiting_for_confirmation)
 
+
 @ds.message(OrderStates.waiting_for_confirmation)
 async def process_confirmation(message: types.Message, state: FSMContext):
     _logger.info("Processing confirmation from client")
@@ -138,25 +144,29 @@ async def process_confirmation(message: types.Message, state: FSMContext):
         await state.set_state(OrderStates.waiting_for_seats)
     await state.clear()
 
+
 async def send_request_to_chat(message: types.Message, table: Table) -> None:
     _logger.info(f"Sending booking detail to separate chat {group_chat_id}")
     user = message.from_user.username
     await bot.send_message(chat_id=group_chat_id,
-                     text=f"\nUser name: {user} "
-                          f"\nTable №: {table.table_id},"
-                          f"\nNumber of seats: {table.capacity},"
-                          f"\nBooking time: {table.readable_booking_time},"
-                          f"\nName: {table.user_name}")
+                           text=f"\nUser name: {user} "
+                                f"\nTable №: {table.table_id},"
+                                f"\nNumber of seats: {table.capacity},"
+                                f"\nBooking time: {table.readable_booking_time},"
+                                f"\nName: {table.user_name}")
 
 
 """
 This part defines manager oriented part which might be used by manager to check bookings
 """
+
+
 @ds.message(Command("check-bookings"))
 async def check_bookings(message: types.Message, state: FSMContext):
     _logger.info("Start checking bookings")
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
     await state.set_state(ManagerStates.waiting_for_date_manager)
+
 
 @ds.message(ManagerStates.waiting_for_date_manager)
 async def process_date_manager(message: types.Message, state: FSMContext):
@@ -187,6 +197,7 @@ async def main():
     except Exception as e:
         _logger.exception("Error while polling")
         raise e
+
 
 if __name__ == "__main__":
     asyncio.run(main())
