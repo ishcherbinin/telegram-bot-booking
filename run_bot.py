@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-
+from aiogram.fsm.storage.memory import MemoryStorage
 from logging_conf import log_config
 from restaurant_space import TablesStorage, Table
 from validators import validate_date, validate_time, validate_seats
@@ -27,8 +27,8 @@ dist_tables = os.getenv("TABLES_FILE")
 tables_storage = TablesStorage.from_csv_file(Path(dist_tables))
 
 bot = Bot(token=api_token)
-
-ds = Dispatcher()
+storage = MemoryStorage()
+ds = Dispatcher(storage=storage)
 
 
 # Define the FSM states for each step
@@ -169,6 +169,7 @@ async def check_bookings(message: types.Message, state: FSMContext):
         return
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
     await state.set_state(ManagerStates.waiting_for_date_manager)
+    _logger.info("Waiting for date")
 
 
 @ds.message(ManagerStates.waiting_for_date_manager)
@@ -193,6 +194,12 @@ async def process_date_manager(message: types.Message, state: FSMContext):
                              f"\nName: {table.user_name}")
     await state.clear()
 
+
+@ds.message(Command("get-id"))
+async def get_id(message: types.Message):
+    ids = str(message.chat.id)
+    _logger.info(f"Chat id: {ids}")
+    await message.answer(ids)
 
 async def main():
     try:
