@@ -1,7 +1,9 @@
 import asyncio
 import logging.config
 import os
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -19,9 +21,10 @@ _logger = logging.getLogger(__name__)
 # assign environment variables to variables
 api_token = os.getenv("TELEGRAM_API_TOKEN")
 
-group_chat_id = os.getenv("GROUP_CHAT_ID")
+group_chat_id = str(os.getenv("GROUP_CHAT_ID"))
 
 dist_tables = os.getenv("TABLES_FILE")
+allowed_chat_ids = {os.getenv("ALLOWED_CHAT_IDS")} | {group_chat_id}
 
 # create relevant objects
 tables_storage = TablesStorage.from_csv_file(Path(dist_tables))
@@ -42,6 +45,8 @@ class OrderStates(StatesGroup):
 
 class ManagerStates(StatesGroup):
     waiting_for_date_manager = State()
+    cancel_single_reservation = State()
+    reserve_single_table = State()
 
 
 """
@@ -160,26 +165,67 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
 This part defines manager oriented part which might be used by manager to check bookings
 """
 
+async def validate_chat_id(chat_id: str, message: types.Message) -> bool:
+    if chat_id in allowed_chat_ids:
+        await message.answer("You are not allowed to use this command")
+        return True
+    return False
 
 @ds.message(Command("check-bookings"))
 async def check_bookings(message: types.Message, state: FSMContext):
     _logger.info("Start checking bookings")
-    if str(message.chat.id) != str(group_chat_id):
-        await message.answer("You are not allowed to use this command")
+    if validate_chat_id(str(message.chat.id), message):
         return
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
     await state.set_state(ManagerStates.waiting_for_date_manager)
-    _logger.info("Waiting for date")
 
 
-@ds.message(ManagerStates.waiting_for_date_manager)
-async def process_date_manager(message: types.Message, state: FSMContext):
-    _logger.info("Processing request particular date for checking bookings")
+@ds.message(Command("reserve-table"))
+async def reserve_table(message: types.Message, state: FSMContext):
+    _logger.info("Start reserving table")
+    if validate_chat_id(str(message.chat.id), message):
+        return
+    await message.answer("Please provide date you want to reserve table for. Format: DD.MM")
+    # await state.set_state(ManagerStates.waiting_for_date_manager)
+
+@ds.message(Command("cancel-reservation"))
+async def cancel_reservation(message: types.Message, state: FSMContext):
+    _logger.info("Start cancelling reservation")
+    if validate_chat_id(str(message.chat.id), message):
+        return
+    await message.answer("Please provide date you want to cancel reservation for. Format: DD.MM")
+    await state.set_state(ManagerStates.cancel_single_reservation)
+
+@ds.message(ManagerStates.cancel_single_reservation)
+async def process_cancel_reservation(message: types.Message, state: FSMContext):
+    _logger.info("Processing request particular date for cancelling reservation")
+    chosen_date = await get_requested_date(message, state)
+    if chosen_date is None:
+        return
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    tables = [table for table in tables_for_date if table.is_reserved]
+    if not tables:
+        await message.answer("There are no bookings for this date")
+        await state.clear()
+        return
+    await message.answer(f"Please provide table number you want to cancel reservation for. "
+                         f"Available tables: {[table.table_id for table in tables]}")
+    await state.set_data({"tables": tables})
+
+async def get_requested_date(message: types.Message, state: FSMContext) -> Optional[datetime]:
     date = message.text
     chosen_date = await validate_date(date)
     if chosen_date is None:
         await message.answer("Please enter a valid date and time in the format DD.MM")
         await state.set_state(ManagerStates.waiting_for_date_manager)
+        return
+    return chosen_date
+
+@ds.message(ManagerStates.waiting_for_date_manager)
+async def process_date_manager(message: types.Message, state: FSMContext):
+    _logger.info("Processing request particular date for checking bookings")
+    chosen_date = await get_requested_date(message, state)
+    if chosen_date is None:
         return
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
     tables = [table for table in tables_for_date if table.is_reserved]
@@ -194,9 +240,11 @@ async def process_date_manager(message: types.Message, state: FSMContext):
                              f"\nName: {table.user_name}")
     await state.clear()
 
-
 @ds.message(Command("get-id"))
 async def get_id(message: types.Message):
+    if str(message.chat.id) in allowed_chat_ids:
+        await message.answer("You are not allowed to use this command")
+        return
     ids = str(message.chat.id)
     _logger.info(f"Chat id: {ids}")
     await message.answer(ids)
