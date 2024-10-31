@@ -30,6 +30,7 @@ CURRENT_TABLE: Table = None
 # Define the FSM states for each step
 class OrderStates(StatesGroup):
     waiting_for_seats = State()
+    waiting_for_date = State()
     waiting_for_name = State()
     waiting_for_time = State()
     waiting_for_confirmation = State()
@@ -39,8 +40,24 @@ class OrderStates(StatesGroup):
 async def book_table(message: types.Message, state: FSMContext):
     _logger.info("Start booking table")
     _logger.debug(message)
+    await message.answer("Please provide date you want to reserve table for. Format: DD.MM")
+    await state.set_state(OrderStates.waiting_for_date)
+
+@ds.message(OrderStates.waiting_for_date)
+async def process_date(message: types.Message, state: FSMContext):
+    _logger.info("Processing request particular date for booking")
+    date = message.text
+    try:
+        chosen_date = datetime.strptime(date, "%d.%m")
+    except ValueError:
+        await message.answer("Please enter a valid date and time in the format DD.MM HH:MM")
+        await state.set_state(OrderStates.waiting_for_date)
+        return
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    await state.set_data({"tables": tables_for_date})
     await message.answer("Please provide the number of seats you need")
     await state.set_state(OrderStates.waiting_for_seats)
+
 
 @ds.message(OrderStates.waiting_for_seats)
 async def process_seats(message: types.Message, state: FSMContext):
@@ -52,7 +69,9 @@ async def process_seats(message: types.Message, state: FSMContext):
         return
     seats = int(seats)
     _logger.info(f"User requested table for {seats} seats")
-    table = tables_storage.search_for_table(seats)
+    data = await state.get_data()
+    tables = data["tables"]
+    table = tables_storage.search_for_table(seats, tables)
     await state.set_data({"table": table})
     if not table:
         await message.answer("Sorry, we don't have a table for this number of seats")
@@ -70,7 +89,7 @@ async def process_name(message: types.Message, state: FSMContext):
     data = await state.get_data()
     table = data["table"]
     table.user_name = name
-    await message.answer("Please provide time you want to book the table for. Format: DD.MM HH:MM")
+    await message.answer("Please provide time you want to book the table for. Format: HH:MM")
     await message.answer("NOTE. Booking will be kept only for 1 hour after time you provided")
     await state.set_state(OrderStates.waiting_for_time)
 
@@ -79,9 +98,9 @@ async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
     time = message.text
     try:
-        booking_time = datetime.strptime(time, "%d.%m %H:%M")
+        booking_time = datetime.strptime(time, "%H:%M")
     except ValueError:
-        await message.answer("Please enter a valid date and time in the format DD.MM HH:MM")
+        await message.answer("Please enter a valid date and time in the format HH:MM")
         await state.set_state(OrderStates.waiting_for_time)
         return
     _logger.info(f"Booking time: {booking_time}")
