@@ -1,7 +1,6 @@
 import asyncio
 import logging.config
 import os
-from datetime import datetime
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, types
@@ -11,20 +10,25 @@ from aiogram.fsm.state import State, StatesGroup
 
 from logging_conf import log_config
 from restaurant_space import TablesStorage, Table
-from validators import validate_date
+from validators import validate_date, validate_time, validate_seats
 
 logging.config.dictConfig(log_config)
 
 _logger = logging.getLogger(__name__)
 
+
+# assign environment variables to variables
 api_token = os.getenv("TELEGRAM_API_TOKEN")
 
 group_chat_id = os.getenv("GROUP_CHAT_ID")
 
 dist_tables = os.getenv("TABLES_FILE")
 
+# create relevant objects
 tables_storage = TablesStorage.from_csv_file(Path(dist_tables))
+
 bot = Bot(token=api_token)
+
 ds = Dispatcher()
 
 # Define the FSM states for each step
@@ -34,8 +38,10 @@ class OrderStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_time = State()
     waiting_for_confirmation = State()
-    waiting_for_date_manager = State()
 
+
+class ManagerStates(StatesGroup):
+    waiting_for_date_manager = State()
 
 """
 This part defines client oriented part which might be used by account to book table in the restaurant
@@ -54,7 +60,7 @@ async def process_date(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for booking")
     date = message.text
     chosen_date = await validate_date(date)
-    if not chosen_date:
+    if chosen_date is None:
         await message.answer("Please enter a valid date and time in the format DD.MM")
         await state.set_state(OrderStates.waiting_for_date_client)
         return
@@ -68,16 +74,15 @@ async def process_date(message: types.Message, state: FSMContext):
 async def process_seats(message: types.Message, state: FSMContext):
     _logger.info("Processing request for number of seats")
     seats = message.text
-    if not seats.isdigit():
+    seats = await validate_seats(seats)
+    if seats is None:
         await message.answer("Please enter a valid number. Number should be digit")
         await state.set_state(OrderStates.waiting_for_seats)
         return
-    seats = int(seats)
     _logger.info(f"User requested table for {seats} seats")
     data = await state.get_data()
     tables = data["tables"]
     table = tables_storage.search_for_table(seats, tables)
-    await state.set_data({"table": table})
     if not table:
         await message.answer("Sorry, we don't have a table for this number of seats")
         await state.set_state(OrderStates.waiting_for_seats)
@@ -102,9 +107,8 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
     time = message.text
-    try:
-        booking_time = datetime.strptime(time, "%H:%M")
-    except ValueError:
+    booking_time = await validate_time(time)
+    if time is None:
         await message.answer("Please enter a valid date and time in the format HH:MM")
         await state.set_state(OrderStates.waiting_for_time)
         return
@@ -119,7 +123,7 @@ async def process_time(message: types.Message, state: FSMContext):
 
 @ds.message(OrderStates.waiting_for_confirmation)
 async def process_confirmation(message: types.Message, state: FSMContext):
-    _logger.info("Processing confirmation")
+    _logger.info("Processing confirmation from client")
     data = await state.get_data()
     table = data["table"]
     confirmation = message.text.upper()
@@ -148,31 +152,34 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
 """
 This part defines manager oriented part which might be used by manager to check bookings
 """
-
-@ds.message(Command("booked-tables"))
-async def booked_tables(message: types.Message, state: FSMContext):
-    _logger.info("Start checking booked tables")
+@ds.message(Command("check-bookings"))
+async def check_bookings(message: types.Message, state: FSMContext):
+    _logger.info("Start checking bookings")
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
-    await state.set_state(OrderStates.waiting_for_date_manager)
+    await state.set_state(ManagerStates.waiting_for_date_manager)
 
-@ds.message(OrderStates.waiting_for_date_manager)
-async def processing_date_manager(message: types.Message, state: FSMContext):
+@ds.message(ManagerStates.waiting_for_date_manager)
+async def process_date_manager(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for checking bookings")
     date = message.text
     chosen_date = await validate_date(date)
-    if not chosen_date:
+    if chosen_date is None:
         await message.answer("Please enter a valid date and time in the format DD.MM")
-        await state.set_state(OrderStates.waiting_for_date_manager)
+        await state.set_state(ManagerStates.waiting_for_date_manager)
         return
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
-    reserved_tables = [table for table in tables_for_date if table.is_reserved]
-    if not booked_tables:
-        await message.answer("No tables are booked for this date")
+    tables = [table for table in tables_for_date if table.is_reserved]
+    if not tables:
+        await message.answer("There are no bookings for this date")
         await state.clear()
         return
-    for index, table in enumerate(reserved_tables):
-        await message.answer(f"{index + 1}. Table {table.table_id} for {table.capacity} "
-                             f"seats is booked for {table.user_name} at {table.readable_booking_time}")
+    for table in tables:
+        await message.answer(f"Table №: {table.table_id},"
+                             f"\nNumber of seats: {table.capacity},"
+                             f"\nBooking time: {table.readable_booking_time},"
+                             f"\nName: {table.user_name}")
+    await state.clear()
+
 
 async def main():
     try:

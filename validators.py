@@ -8,3 +8,15 @@ async def validate_date(date: str) -> Optional[datetime]:
     except ValueError:
         return None
     return chosen_date
+
+async def validate_time(time: str) -> Optional[datetime]:
+    try:
+        chosen_time = datetime.strptime(time, "%H:%M")
+    except ValueError:
+        return None
+    return chosen_time
+
+async def validate_seats(seats: str) -> Optional[int]:
+    if not seats.isdigit():
+        return None
+    return int(seats)
