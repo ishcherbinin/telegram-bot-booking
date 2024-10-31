@@ -45,7 +45,8 @@ class OrderStates(StatesGroup):
 
 class ManagerStates(StatesGroup):
     waiting_for_date_manager = State()
-    cancel_single_reservation = State()
+    wait_for_number_for_cancel = State()
+    waiting_cancel_reservation = State()
     reserve_single_table = State()
 
 
@@ -194,11 +195,11 @@ async def cancel_reservation(message: types.Message, state: FSMContext):
     if validate_chat_id(str(message.chat.id), message):
         return
     await message.answer("Please provide date you want to cancel reservation for. Format: DD.MM")
-    await state.set_state(ManagerStates.cancel_single_reservation)
+    await state.set_state(ManagerStates.wait_for_number_for_cancel)
 
-@ds.message(ManagerStates.cancel_single_reservation)
-async def process_cancel_reservation(message: types.Message, state: FSMContext):
-    _logger.info("Processing request particular date for cancelling reservation")
+@ds.message(ManagerStates.wait_for_number_for_cancel)
+async def process_number_for_reservation(message: types.Message, state: FSMContext):
+    _logger.info("Processing request for table number to cancel reservation")
     chosen_date = await get_requested_date(message, state)
     if chosen_date is None:
         return
@@ -211,6 +212,23 @@ async def process_cancel_reservation(message: types.Message, state: FSMContext):
     await message.answer(f"Please provide table number you want to cancel reservation for. "
                          f"Available tables: {[table.table_id for table in tables]}")
     await state.set_data({"tables": tables})
+
+@ds.message(ManagerStates.waiting_cancel_reservation)
+async def process_cancel_reservation(message: types.Message, state: FSMContext):
+    _logger.info("Processing request for table number to cancel reservation")
+    table_number = message.text
+    data = await state.get_data()
+    tables = data["tables"]
+    table = next((table for table in tables if table.table_id == int(table_number)), None)
+    if table is None:
+        await message.answer("Table with this number is not found")
+        await state.set_state(ManagerStates.waiting_cancel_reservation)
+        return
+    table.is_reserved = False
+    table.booking_time = None
+    table.user_name = None
+    await message.answer(f"Reservation for table №{table.table_id} is cancelled")
+    await state.clear()
 
 async def get_requested_date(message: types.Message, state: FSMContext) -> Optional[datetime]:
     date = message.text
