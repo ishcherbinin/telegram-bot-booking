@@ -1,6 +1,7 @@
 import csv
 from dataclasses import dataclass
 from datetime import datetime, date
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 
@@ -56,12 +57,13 @@ class TablesStorage:
         :return:
         """
         for table in tables:
+            # TODO Change approach to find table closer to the capacity provided
             if table.capacity >= capacity and not table.is_reserved:
                 return table
         return None
 
     @classmethod
-    def from_csv_file(cls, file_path: str) -> 'TablesStorage':
+    def from_csv_file(cls, file_path: str or Path) -> 'TablesStorage':
         with open(file_path, 'r') as file:
             reader = csv.DictReader(file)
             available_tables = tuple(row for row in reader)

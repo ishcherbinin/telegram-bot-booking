@@ -2,6 +2,7 @@ import asyncio
 import logging.config
 import os
 from datetime import datetime
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -19,13 +20,11 @@ api_token = os.getenv("TELEGRAM_API_TOKEN")
 
 group_chat_id = os.getenv("GROUP_CHAT_ID")
 
+dist_tables = os.getenv("TABLES_FILE")
 
-tables_storage = TablesStorage.from_csv_file("./tables.csv")
+tables_storage = TablesStorage.from_csv_file(Path(dist_tables))
 bot = Bot(token=api_token)
 ds = Dispatcher()
-
-# noinspection PyTypeChecker
-CURRENT_TABLE: Table = None
 
 # Define the FSM states for each step
 class OrderStates(StatesGroup):
