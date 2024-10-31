@@ -164,6 +164,9 @@ This part defines manager oriented part which might be used by manager to check 
 @ds.message(Command("check-bookings"))
 async def check_bookings(message: types.Message, state: FSMContext):
     _logger.info("Start checking bookings")
+    if str(message.chat.id) != str(group_chat_id):
+        await message.answer("You are not allowed to use this command")
+        return
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
     await state.set_state(ManagerStates.waiting_for_date_manager)
 
