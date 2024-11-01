@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+
 from logging_conf import log_config
 from restaurant_space import TablesStorage, Table
 from text_for_helps import customer_help, manager_help
@@ -251,7 +252,7 @@ async def check_bookings(message: types.Message, state: FSMContext):
 
 
 @ds.message(Command("checkbookingstoday"))
-async def check_bookings_today(message: types.Message, state: FSMContext):
+async def check_bookings_today(message: types.Message, _: FSMContext):
     _logger.info("Start checking bookings for today")
     if await validate_chat_id(str(message.chat.id), message):
         return
@@ -308,10 +309,14 @@ async def get_id(message: types.Message):
     await message.answer(ids)
 
 async def main():
+    backup_csv_file = Path("./backup_tables.csv")
     try:
+        if os.path.exists(backup_csv_file):
+            tables_storage.upload_backup_file(backup_csv_file)
         await ds.start_polling(bot)
     except Exception as e:
         _logger.exception("Error while polling")
+        tables_storage.backup_to_csv_file(backup_csv_file)
         raise e
 
 
