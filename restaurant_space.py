@@ -21,6 +21,16 @@ class Table:
     def readable_booking_time(self) -> str:
         return self.booking_time.strftime("%H:%M")
 
+    @property
+    def to_csv_row(self) -> Dict[str, str]:
+        return {
+            "table_id": str(self.table_id),
+            "capacity": str(self.capacity),
+            "is_reserved": str(self.is_reserved),
+            "booking_time": self.readable_booking_time if self.booking_time else "",
+            "user_name": self.user_name if self.user_name else ""
+        }
+
 @dataclass(repr=True)
 class CalendarDate:
     business_date: date
@@ -72,3 +82,27 @@ class TablesStorage:
             available_tables = tuple(row for row in reader)
         return cls(available_tables)
 
+
+    def backup_to_csv_file(self, file_path: str or Path):
+        with open(file_path, "w", encoding="utf-8") as file:
+            writer = csv.DictWriter(file,
+                                    fieldnames=["date", "table_id", "capacity",
+                                                "is_reserved", "booking_time", "user_name"])
+            writer.writeheader()
+            for date_info in self._calendar.values():
+                for table in date_info.tables:
+                    result = {"date": date_info.business_date.strftime("%d.%m.%Y"), **table.to_csv_row}
+                    writer.writerow(result)
+
+    def upload_backup_file(self, file: str or Path):
+        with open(file, "r", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                business_date = datetime.strptime(row["date"], "%d.%m.%Y").date()
+                if business_date not in self._calendar:
+                    self._calendar[business_date] = CalendarDate(business_date)
+                table = Table(table_id=int(row["table_id"]), capacity=int(row["capacity"]),
+                              is_reserved=row["is_reserved"] == "True",
+                              booking_time=datetime.strptime(row["booking_time"], "%H:%M") if row["booking_time"] else None,
+                              user_name=row["user_name"])
+                self._calendar[business_date].tables += (table,)
