@@ -43,11 +43,14 @@ class OrderStates(StatesGroup):
     waiting_for_confirmation = State()
 
 
+
 class ManagerStates(StatesGroup):
     waiting_for_date_manager = State()
     wait_for_number_for_cancel = State()
     waiting_cancel_reservation = State()
-    reserve_single_table = State()
+    waiting_for_number_for_reserve = State()
+    waiting_for_name_for_reserve = State()
+    waiting_reserve_table = State()
 
 
 """
@@ -119,7 +122,7 @@ async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
     time = message.text
     booking_time = await validate_time(time)
-    if time is None:
+    if booking_time is None:
         await message.answer("Please enter a valid date and time in the format HH:MM")
         await state.set_state(OrderStates.waiting_for_time)
         return
@@ -143,7 +146,9 @@ async def process_confirmation(message: types.Message, state: FSMContext):
         table.is_reserved = True
         await message.answer(f"Table {table.table_id} for {table.capacity} "
                              f"seats is booked for {table.user_name} at {table.readable_booking_time}")
-        await message.answer("Table is booked. Manager will contact you soon to confirm booking")
+        validation = await validate_chat_id(str(message.chat.id), message)
+        if validation:
+            await message.answer("Table is booked. Manager will contact you soon to confirm booking")
         await send_request_to_chat(message, table)
     else:
         await message.answer("Booking is rejected")
@@ -167,7 +172,9 @@ This part defines manager oriented part which might be used by manager to check 
 """
 
 async def validate_chat_id(chat_id: str, message: types.Message) -> bool:
-    if chat_id in allowed_chat_ids:
+    _logger.info(f"Chat id: {chat_id}")
+    _logger.info(f"Allowed chat ids: {allowed_chat_ids}")
+    if chat_id not in allowed_chat_ids:
         await message.answer("You are not allowed to use this command")
         return True
     return False
@@ -175,30 +182,49 @@ async def validate_chat_id(chat_id: str, message: types.Message) -> bool:
 @ds.message(Command("check-bookings"))
 async def check_bookings(message: types.Message, state: FSMContext):
     _logger.info("Start checking bookings")
-    if validate_chat_id(str(message.chat.id), message):
+    if await validate_chat_id(str(message.chat.id), message):
         return
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
     await state.set_state(ManagerStates.waiting_for_date_manager)
 
 
+@ds.message(ManagerStates.waiting_for_date_manager)
+async def process_date_manager(message: types.Message, state: FSMContext):
+    _logger.info("Processing request particular date for checking bookings")
+    chosen_date = await get_requested_date(message, state)
+    if chosen_date is None:
+        return
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    tables = [table for table in tables_for_date if table.is_reserved]
+    if not tables:
+        await message.answer("There are no bookings for this date")
+        await state.clear()
+        return
+    for table in tables:
+        await message.answer(f"Table №: {table.table_id},"
+                             f"\nNumber of seats: {table.capacity},"
+                             f"\nBooking time: {table.readable_booking_time},"
+                             f"\nName: {table.user_name}")
+    await state.clear()
+
 @ds.message(Command("reserve-table"))
 async def reserve_table(message: types.Message, state: FSMContext):
     _logger.info("Start reserving table")
-    if validate_chat_id(str(message.chat.id), message):
+    if await validate_chat_id(str(message.chat.id), message):
         return
     await message.answer("Please provide date you want to reserve table for. Format: DD.MM")
-    # await state.set_state(ManagerStates.waiting_for_date_manager)
+    await state.set_state(OrderStates.waiting_for_date_client)
 
 @ds.message(Command("cancel-reservation"))
 async def cancel_reservation(message: types.Message, state: FSMContext):
     _logger.info("Start cancelling reservation")
-    if validate_chat_id(str(message.chat.id), message):
+    if await validate_chat_id(str(message.chat.id), message):
         return
     await message.answer("Please provide date you want to cancel reservation for. Format: DD.MM")
     await state.set_state(ManagerStates.wait_for_number_for_cancel)
 
 @ds.message(ManagerStates.wait_for_number_for_cancel)
-async def process_number_for_reservation(message: types.Message, state: FSMContext):
+async def process_number_for_reservation_cancel(message: types.Message, state: FSMContext):
     _logger.info("Processing request for table number to cancel reservation")
     chosen_date = await get_requested_date(message, state)
     if chosen_date is None:
@@ -212,6 +238,7 @@ async def process_number_for_reservation(message: types.Message, state: FSMConte
     await message.answer(f"Please provide table number you want to cancel reservation for. "
                          f"Available tables: {[table.table_id for table in tables]}")
     await state.set_data({"tables": tables})
+    await state.set_state(ManagerStates.waiting_cancel_reservation)
 
 @ds.message(ManagerStates.waiting_cancel_reservation)
 async def process_cancel_reservation(message: types.Message, state: FSMContext):
@@ -238,25 +265,6 @@ async def get_requested_date(message: types.Message, state: FSMContext) -> Optio
         await state.set_state(ManagerStates.waiting_for_date_manager)
         return
     return chosen_date
-
-@ds.message(ManagerStates.waiting_for_date_manager)
-async def process_date_manager(message: types.Message, state: FSMContext):
-    _logger.info("Processing request particular date for checking bookings")
-    chosen_date = await get_requested_date(message, state)
-    if chosen_date is None:
-        return
-    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
-    tables = [table for table in tables_for_date if table.is_reserved]
-    if not tables:
-        await message.answer("There are no bookings for this date")
-        await state.clear()
-        return
-    for table in tables:
-        await message.answer(f"Table №: {table.table_id},"
-                             f"\nNumber of seats: {table.capacity},"
-                             f"\nBooking time: {table.readable_booking_time},"
-                             f"\nName: {table.user_name}")
-    await state.clear()
 
 @ds.message(Command("get-id"))
 async def get_id(message: types.Message):
