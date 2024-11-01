@@ -10,10 +10,12 @@ async def validate_date(date: str) -> Tuple[Optional[datetime], str]:
     try:
         current_year = datetime.now().year
         full_date_str = f"{date}.{current_year}"
-        chosen_date = datetime.strptime(full_date_str, "%d.%m")
+        chosen_date = datetime.strptime(full_date_str, "%d.%m.%Y")
     except ValueError:
         _logger.debug(f"Failed to parse date: {date}")
         return None, "Invalid format for date. Please enter a valid date and time in the format DD.MM"
+    if chosen_date.date() < datetime.now().date():
+        return None, "You can't book a table in the past. Please enter date in the future"
     return chosen_date, ""
 
 async def validate_time(time: str) -> Tuple[Optional[datetime], str]:

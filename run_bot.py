@@ -174,6 +174,15 @@ async def cancel_reservation(message: types.Message, state: FSMContext):
     await message.answer("Please provide date you want to cancel reservation for. Format: DD.MM")
     await state.set_state(OrderStates.wait_for_number_for_cancel)
 
+@ds.message(Command("cancel-reservation-today"))
+async def cancel_reservation_today(message: types.Message, state: FSMContext):
+    _logger.info("Start cancelling reservation for today")
+    chosen_date = datetime.now()
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    await state.set_data({"tables": tables_for_date})
+    await message.answer("Please provide table number you want to cancel reservation for.")
+    await state.set_state(OrderStates.wait_for_number_for_cancel)
+
 @ds.message(OrderStates.wait_for_number_for_cancel)
 async def process_number_for_reservation_cancel(message: types.Message, state: FSMContext):
     _logger.info("Processing request for table number to cancel reservation")
@@ -235,8 +244,11 @@ async def check_bookings(message: types.Message, state: FSMContext):
 @ds.message(ManagerStates.waiting_for_date_manager)
 async def process_date_manager(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for checking bookings")
-    chosen_date = await get_requested_date(message, state)
+    date = message.text
+    chosen_date, text = await validate_date(date)
     if chosen_date is None:
+        await message.answer(text)
+        await state.set_state(ManagerStates.waiting_for_date_manager)
         return
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
     tables = [table for table in tables_for_date if table.is_reserved]
@@ -256,7 +268,7 @@ async def get_requested_date(message: types.Message, state: FSMContext) -> Optio
     chosen_date, text = await validate_date(date)
     if chosen_date is None:
         await message.answer(text)
-        await state.set_state(ManagerStates.waiting_for_date_manager)
+        await state.set_state(OrderStates.waiting_for_date_client)
         return
     return chosen_date
 
