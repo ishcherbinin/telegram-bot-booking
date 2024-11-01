@@ -1,7 +1,7 @@
 ## Description
 
 #### Telegram bot to book tables in the restaurant. It allows to store, cancel, check bookings for tables in different dates
-#### There to use it you need to have telegram account and set up chat with managers, where bot will send all booking details and allows to manage bookings on management level
+#### To use it you need to have telegram account and set up chat with managers, where bot will send all booking details and allows to manage bookings on management level
 
 
 ## Installation
