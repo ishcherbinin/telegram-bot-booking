@@ -29,7 +29,8 @@ class Table:
             "capacity": str(self.capacity),
             "is_reserved": str(self.is_reserved),
             "booking_time": self.readable_booking_time if self.booking_time else "",
-            "user_name": self.user_name if self.user_name else ""
+            "user_name": self.user_name if self.user_name else "",
+            "user_id": self.user_id if self.user_id else ""
         }
 
 @dataclass(repr=True)
@@ -92,7 +93,7 @@ class TablesStorage:
         with open(file_path, "w", encoding="utf-8") as file:
             writer = csv.DictWriter(file,
                                     fieldnames=["date", "table_id", "capacity",
-                                                "is_reserved", "booking_time", "user_name"])
+                                                "is_reserved", "booking_time", "user_name", "user_id"])
             writer.writeheader()
             for date_info in self._calendar.values():
                 for table in date_info.tables:
