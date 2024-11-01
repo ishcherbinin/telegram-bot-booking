@@ -12,6 +12,7 @@ class Table:
     is_reserved: bool = False
     booking_time: datetime = None
     user_name: str = None
+    user_id: str = None
 
     def __str__(self):
         return (f"Table {self.table_id} with capacity {self.capacity} "
