@@ -56,10 +56,13 @@ class TablesStorage:
         :param capacity:
         :return:
         """
-        for table in tables:
-            # TODO Change approach to find table closer to the capacity provided
-            if table.capacity >= capacity and not table.is_reserved:
-                return table
+        # Filter tables that have at least the required capacity and are not reserved
+        available_tables = [table for table in tables if table.capacity >= capacity and not table.is_reserved]
+
+        # Sort tables by how closely their capacity matches the requested capacity
+        if available_tables:
+            best_table = min(available_tables, key=lambda t: t.capacity - capacity)
+            return best_table
         return None
 
     @classmethod
