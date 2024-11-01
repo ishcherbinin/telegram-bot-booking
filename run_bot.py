@@ -25,7 +25,7 @@ api_token = os.getenv("TELEGRAM_API_TOKEN")
 
 group_chat_id = str(os.getenv("GROUP_CHAT_ID"))
 
-dist_tables = os.getenv("TABLES_FILE")
+dist_tables = Path(os.path.dirname(__file__)) / Path(os.getenv("TABLES_FILE"))
 allowed_chat_ids = {os.getenv("ALLOWED_CHAT_IDS")} | {group_chat_id}
 
 # create relevant objects
@@ -55,7 +55,7 @@ This part defines common part which might be used by account or manager to book 
 Open chat with bot and type /book-table to start booking process
 """
 
-@ds.message(Command("help"))
+@ds.message(Command(commands=["help", "start"]))
 async def help_command(message: types.Message):
     _logger.info("Help command is requested")
     if await validate_chat_id(str(message.chat.id)):
