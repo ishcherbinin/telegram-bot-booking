@@ -179,6 +179,8 @@ async def process_confirmation(message: types.Message, state: FSMContext):
             await message.answer("Table is booked. Manager will contact you soon to confirm booking")
             await send_request_to_chat(message, table)
     else:
+        table.user_name = None
+        table.booking_time = None
         await message.answer("Booking is rejected")
         await state.set_state(OrderStates.waiting_for_seats)
     await state.clear()
