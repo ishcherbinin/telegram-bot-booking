@@ -318,7 +318,7 @@ async def get_id(message: types.Message):
     await message.answer(ids)
 
 async def main():
-    backup_csv_file = Path("./backup_tables.csv")
+    backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")
     try:
         if os.path.exists(backup_csv_file):
             tables_storage.upload_backup_file(backup_csv_file)
