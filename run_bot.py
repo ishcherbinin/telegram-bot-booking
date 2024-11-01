@@ -83,8 +83,9 @@ async def book_table_today(message: types.Message, state: FSMContext):
 @ds.message(OrderStates.waiting_for_date_client)
 async def process_date(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for booking")
-    chosen_date = await get_requested_date(message, state)
+    chosen_date = await get_requested_date(message)
     if chosen_date is None:
+        await state.set_state(OrderStates.waiting_for_date_client)
         return
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
     await state.set_data({"tables": tables_for_date})
@@ -280,10 +281,8 @@ async def check_bookings_today(message: types.Message, state: FSMContext):
 @ds.message(ManagerStates.waiting_for_date_manager)
 async def process_date_manager(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for checking bookings")
-    date = message.text
-    chosen_date, text = await validate_date(date)
+    chosen_date = await get_requested_date(message)
     if chosen_date is None:
-        await message.answer(text)
         await state.set_state(ManagerStates.waiting_for_date_manager)
         return
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
@@ -299,12 +298,11 @@ async def process_date_manager(message: types.Message, state: FSMContext):
                              f"\nName: {table.user_name}")
     await state.clear()
 
-async def get_requested_date(message: types.Message, state: FSMContext) -> Optional[datetime]:
+async def get_requested_date(message: types.Message) -> Optional[datetime]:
     date = message.text
     chosen_date, text = await validate_date(date)
     if chosen_date is None:
         await message.answer(text)
-        await state.set_state(OrderStates.waiting_for_date_client)
         return
     return chosen_date
 
