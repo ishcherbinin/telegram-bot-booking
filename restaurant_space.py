@@ -76,6 +76,10 @@ class TablesStorage:
             return best_table
         return None
 
+    @property
+    def get_all_bookings(self) -> Dict[date, Tuple[Table, ...]]:
+        return {date_info.business_date: date_info.tables for date_info in self._calendar.values()}
+
     @classmethod
     def from_csv_file(cls, file_path: str or Path) -> 'TablesStorage':
         with open(file_path, 'r') as file:

@@ -10,7 +10,12 @@ NOTE. you need a table number for these commands
 /cancelreservationtoday- to cancel reservation for a table for today only.
 """
 
-customer_help = common_part
+customer_help = f"""
+{common_part}
+
+/mybookings - to check all your bookings
+
+"""
 
 manager_help = f"""
 {common_part}

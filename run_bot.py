@@ -80,6 +80,23 @@ async def book_table_today(message: types.Message, state: FSMContext):
     await state.set_data({"tables": tables_for_date})
     await state.set_state(OrderStates.waiting_for_seats)
 
+@ds.message(Command("mybookings"))
+async def my_bookings(message: types.Message, state: FSMContext):
+    _logger.info("Start checking bookings")
+    if not await validate_chat_id(str(message.chat.id)):
+        await message.answer("You are not allowed to use this command")
+        return
+    all_bookings = tables_storage.get_all_bookings
+    for date, bookings in all_bookings.items():
+        user_bookings = [table for table in bookings if table.user_id == message.from_user.username]
+        for booking in user_bookings:
+            await message.answer(f"\nDate: {date},"
+                                f"\nTable №: {booking.table_id},"
+                                 f"\nNumber of seats: {booking.capacity},"
+                                 f"\nBooking time: {booking.readable_booking_time},"
+                                 f"\nName: {booking.user_name}")
+    await state.clear()
+
 @ds.message(OrderStates.waiting_for_date_client)
 async def process_date(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for booking")
