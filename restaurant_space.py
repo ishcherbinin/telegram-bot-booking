@@ -83,6 +83,11 @@ class TablesStorage:
 
     @classmethod
     def from_csv_file(cls, file_path: str or Path) -> 'TablesStorage':
+        """
+        Method creates a new instance of the class from a csv file
+        :param file_path:
+        :return:
+        """
         with open(file_path, 'r') as file:
             reader = csv.DictReader(file)
             available_tables = tuple(row for row in reader)
@@ -90,6 +95,11 @@ class TablesStorage:
 
 
     def backup_to_csv_file(self, file_path: str or Path):
+        """
+        Methods saves all tables to a csv file to store in case of failures or restarts
+        :param file_path:
+        :return:
+        """
         with open(file_path, "w", encoding="utf-8") as file:
             writer = csv.DictWriter(file,
                                     fieldnames=["date", "table_id", "capacity",
@@ -101,6 +111,11 @@ class TablesStorage:
                     writer.writerow(result)
 
     def upload_backup_file(self, file: str or Path):
+        """
+        Method uploads backup file to the storage
+        :param file:
+        :return:
+        """
         with open(file, "r", encoding="utf-8") as file:
             reader = csv.DictReader(file)
             for row in reader:
