@@ -87,8 +87,14 @@ async def my_bookings(message: types.Message, state: FSMContext):
         await message.answer("You are not allowed to use this command")
         return
     all_bookings = tables_storage.get_all_bookings
+    if len(all_bookings) == 0:
+        await message.answer(f"No bookings for found")
+        return
     for date, bookings in all_bookings.items():
         user_bookings = [table for table in bookings if table.user_id == message.from_user.username]
+        if len(user_bookings) == 0:
+            await message.answer(f"No bookings for found")
+            continue
         for booking in user_bookings:
             await message.answer(f"\nDate: {date},"
                                 f"\nTable №: {booking.table_id},"
