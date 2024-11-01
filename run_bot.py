@@ -71,11 +71,8 @@ async def book_table(message: types.Message, state: FSMContext):
 @ds.message(OrderStates.waiting_for_date_client)
 async def process_date(message: types.Message, state: FSMContext):
     _logger.info("Processing request particular date for booking")
-    date = message.text
-    chosen_date = await validate_date(date)
+    chosen_date = await get_requested_date(message, state)
     if chosen_date is None:
-        await message.answer("Please enter a valid date and time in the format DD.MM")
-        await state.set_state(OrderStates.waiting_for_date_client)
         return
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
     await state.set_data({"tables": tables_for_date})
@@ -122,9 +119,9 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
     time = message.text
-    booking_time = await validate_time(time)
+    booking_time, text = await validate_time(time)
     if booking_time is None:
-        await message.answer("Please enter a valid date and time in the format HH:MM")
+        await message.answer(text)
         await state.set_state(OrderStates.waiting_for_time)
         return
     _logger.info(f"Booking time: {booking_time}")
@@ -261,9 +258,9 @@ async def process_cancel_reservation(message: types.Message, state: FSMContext):
 
 async def get_requested_date(message: types.Message, state: FSMContext) -> Optional[datetime]:
     date = message.text
-    chosen_date = await validate_date(date)
+    chosen_date, text = await validate_date(date)
     if chosen_date is None:
-        await message.answer("Please enter a valid date and time in the format DD.MM")
+        await message.answer(text)
         await state.set_state(ManagerStates.waiting_for_date_manager)
         return
     return chosen_date
