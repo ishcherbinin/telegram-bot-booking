@@ -12,6 +12,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from logging_conf import log_config
 from restaurant_space import TablesStorage, Table
+from text_for_helps import customer_help, manager_help
 from validators import validate_date, validate_time, validate_seats
 
 logging.config.dictConfig(log_config)
@@ -53,15 +54,23 @@ This part defines common part which might be used by account or manager to book 
 Open chat with bot and type /book-table to start booking process
 """
 
+@ds.message(Command("help"))
+async def help_command(message: types.Message):
+    _logger.info("Help command is requested")
+    if await validate_chat_id(str(message.chat.id), message):
+        await message.answer(customer_help)
+    else:
+        await message.answer(manager_help)
 
-@ds.message(Command("book-table"))
+
+@ds.message(Command("booktable"))
 async def book_table(message: types.Message, state: FSMContext):
     _logger.info("Start booking table")
     _logger.debug(message)
     await message.answer("Please provide date you want to reserve table for. Format: DD.MM")
     await state.set_state(OrderStates.waiting_for_date_client)
 
-@ds.message(Command("book-table-today"))
+@ds.message(Command("booktabletoday"))
 async def book_table_today(message: types.Message, state: FSMContext):
     _logger.info("Start booking table for today")
     await message.answer("Please provide number of seats you need")
@@ -168,13 +177,13 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
                                 f"\nName: {table.user_name}")
 
 
-@ds.message(Command("cancel-reservation"))
+@ds.message(Command("cancelreservation"))
 async def cancel_reservation(message: types.Message, state: FSMContext):
     _logger.info("Start cancelling reservation")
     await message.answer("Please provide date you want to cancel reservation for. Format: DD.MM")
     await state.set_state(OrderStates.wait_for_number_for_cancel)
 
-@ds.message(Command("cancel-reservation-today"))
+@ds.message(Command("cancelreservationtoday"))
 async def cancel_reservation_today(message: types.Message, state: FSMContext):
     _logger.info("Start cancelling reservation for today")
     chosen_date = datetime.now()
@@ -232,7 +241,7 @@ async def validate_chat_id(chat_id: str, message: types.Message) -> bool:
         return True
     return False
 
-@ds.message(Command("check-bookings"))
+@ds.message(Command("checkbookings"))
 async def check_bookings(message: types.Message, state: FSMContext):
     _logger.info("Start checking bookings")
     if await validate_chat_id(str(message.chat.id), message):
@@ -240,6 +249,23 @@ async def check_bookings(message: types.Message, state: FSMContext):
     await message.answer("Please provide date you want to check bookings for. Format: DD.MM")
     await state.set_state(ManagerStates.waiting_for_date_manager)
 
+
+@ds.message(Command("checkbookingstoday"))
+async def check_bookings_today(message: types.Message, state: FSMContext):
+    _logger.info("Start checking bookings for today")
+    if await validate_chat_id(str(message.chat.id), message):
+        return
+    chosen_date = datetime.now()
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    tables = [table for table in tables_for_date if table.is_reserved]
+    if not tables:
+        await message.answer("There are no bookings for today")
+        return
+    for table in tables:
+        await message.answer(f"Table №: {table.table_id},"
+                             f"\nNumber of seats: {table.capacity},"
+                             f"\nBooking time: {table.readable_booking_time},"
+                             f"\nName: {table.user_name}")
 
 @ds.message(ManagerStates.waiting_for_date_manager)
 async def process_date_manager(message: types.Message, state: FSMContext):
@@ -272,7 +298,7 @@ async def get_requested_date(message: types.Message, state: FSMContext) -> Optio
         return
     return chosen_date
 
-@ds.message(Command("get-id"))
+@ds.message(Command("getid"))
 async def get_id(message: types.Message):
     if str(message.chat.id) in allowed_chat_ids:
         await message.answer("You are not allowed to use this command")
