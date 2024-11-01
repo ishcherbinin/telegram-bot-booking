@@ -149,7 +149,7 @@ async def process_confirmation(message: types.Message, state: FSMContext):
         validation = await validate_chat_id(str(message.chat.id), message)
         if validation:
             await message.answer("Table is booked. Manager will contact you soon to confirm booking")
-        await send_request_to_chat(message, table)
+            await send_request_to_chat(message, table)
     else:
         await message.answer("Booking is rejected")
         await state.set_state(OrderStates.waiting_for_seats)
