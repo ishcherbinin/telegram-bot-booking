@@ -14,7 +14,7 @@ To set up and authenticate your bot, you’ll need a unique token ID from Telegr
 
 2. Start a Chat with BotFather by selecting it and clicking the Start button. You can also send /start to initiate a conversation.
 
-3. Create a New Bot by sending the command /newbot. BotFather will prompt you to:
+3. Create a New Bot by sending the command `/newbot`. BotFather will prompt you to:
 
    - Choose a Name: Enter a name for your bot (e.g., MyOrderBot).
    - Choose a Username: Enter a unique username that ends with bot (e.g., MyOrderBot_bot).
@@ -30,3 +30,36 @@ Add the Token to Your Code: In your project, set the token as an environment var
 `api_token = "123456789:ABCdefGhIJKlmNOPQRstUVWXyz0123456789"`
 
 6. Manage Your Bot: You can use additional commands with BotFather, like `/setdescription` to add a description or `/setuserpic` to add a profile picture for your bot.
+
+#### Setting Up Your Environment
+Using docker image:
+1. Clone the repository to your local machine.
+2. Create a .env file in the project directory and add the following environment variables
+   - TELEGRAM_API_TOKEN - token you got from @botfather
+   - GROUP_CHAT_ID - chat id of the group where bot will send booking details and manage bookings
+   - TABLES_FILE - path to the file where table's distribution is defined (.csv file with columns table_number, capacity)
+3. Build a docker image with the following command: `docker build -t booking_bot .`
+4. Run the docker container with the following command: `docker run -d booking_bot --env-file .env`
+
+Using python:
+1. Clone the repository to your local machine:
+2. Create a .env file in the project directory and add the following environment variables
+   - TELEGRAM_API_TOKEN - token you got from @botfather
+   - GROUP_CHAT_ID - chat id of the group where bot will send booking details and manage bookings
+   - TABLES_FILE - path to the file where table's distribution is defined (.csv file with columns table_number, capacity)
+3. Install the required packages with the following command: `pip install -r requirements.txt`
+4. Run the bot with the following command: `python run_bot.py`
+
+### 2. Usage
+
+User Booking Process:
+
+The user sends /book, and the bot will prompt for details like date, table size, and time.
+After the booking is confirmed, the user receives a summary and confirmation message.
+
+User can call /cancelbooking and specify the booking id to cancel the booking.
+
+Manager Commands:
+
+A manager in the designated group can use /checkbookings and specify a date to view reserved tables.
+The manager can also use /cancelbooking and specify the booking id to cancel the booking and book table themselves.
