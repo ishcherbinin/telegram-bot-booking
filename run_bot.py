@@ -325,6 +325,7 @@ async def main():
         _logger.exception("Error while polling")
         tables_storage.backup_to_csv_file(backup_csv_file)
         raise e
+    tables_storage.backup_to_csv_file(backup_csv_file)
 
 
 if __name__ == "__main__":
