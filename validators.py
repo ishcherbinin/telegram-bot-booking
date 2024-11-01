@@ -8,7 +8,9 @@ _logger = logging.getLogger(__name__)
 
 async def validate_date(date: str) -> Tuple[Optional[datetime], str]:
     try:
-        chosen_date = datetime.strptime(date, "%d.%m")
+        current_year = datetime.now().year
+        full_date_str = f"{date}.{current_year}"
+        chosen_date = datetime.strptime(full_date_str, "%d.%m")
     except ValueError:
         _logger.debug(f"Failed to parse date: {date}")
         return None, "Invalid format for date. Please enter a valid date and time in the format DD.MM"
