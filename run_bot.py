@@ -41,6 +41,7 @@ class OrderStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_time = State()
     waiting_for_confirmation = State()
+    # TODO add ability to manage reservation thru requests
 
 
 
@@ -148,6 +149,7 @@ async def process_confirmation(message: types.Message, state: FSMContext):
                              f"seats is booked for {table.user_name} at {table.readable_booking_time}")
         validation = await validate_chat_id(str(message.chat.id), message)
         if validation:
+            # TODO add mechanism to confirm from manager
             await message.answer("Table is booked. Manager will contact you soon to confirm booking")
             await send_request_to_chat(message, table)
     else:
