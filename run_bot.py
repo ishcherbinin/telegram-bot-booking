@@ -176,7 +176,6 @@ async def process_confirmation(message: types.Message, state: FSMContext):
                              f"seats is booked for {table.user_name} at {table.readable_booking_time}")
         validation = await validate_chat_id(str(message.chat.id))
         if validation:
-            # TODO add mechanism to confirm from manager
             await message.answer("Table is booked. Manager will contact you soon to confirm booking")
             await send_request_to_chat(message, table)
     else:

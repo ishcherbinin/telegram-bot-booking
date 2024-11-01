@@ -14,7 +14,6 @@ customer_help = f"""
 {common_part}
 
 /mybookings - to check all your bookings
-
 """
 
 manager_help = f"""
@@ -24,5 +23,4 @@ manager_help = f"""
 /checkbookingstoday - to check all bookings for today
 
 /getid - get id of the chat
-
 """
