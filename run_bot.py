@@ -25,7 +25,7 @@ api_token = os.getenv("TELEGRAM_API_TOKEN")
 
 group_chat_id = str(os.getenv("GROUP_CHAT_ID"))
 
-dist_tables = Path(os.path.dirname(__file__)) / Path(os.getenv("TABLES_FILE"))
+dist_tables = Path(os.path.dirname(__file__))/ Path("tables_distribution") / Path(os.getenv("TABLES_FILE"))
 allowed_chat_ids = {os.getenv("ALLOWED_CHAT_IDS")} | {group_chat_id}
 
 # create relevant objects
@@ -49,6 +49,7 @@ class OrderStates(StatesGroup):
 
 class ManagerStates(StatesGroup):
     waiting_for_date_manager = State()
+    waiting_for_table_number = State()
 
 """
 This part defines common part which might be used by account or manager to book table or cancel reservation in the restaurant
@@ -87,13 +88,11 @@ async def my_bookings(message: types.Message, state: FSMContext):
         await message.answer("You are not allowed to use this command")
         return
     all_bookings = tables_storage.get_all_bookings
-    if len(all_bookings) == 0:
-        await message.answer(f"No bookings for found")
-        return
+    no_bookings_found = True
     for date, bookings in all_bookings.items():
-        user_bookings = [table for table in bookings if table.user_id == message.from_user.username]
+        user_bookings = [table for table in bookings
+                         if table.user_id == message.from_user.username and table.is_reserved]
         if len(user_bookings) == 0:
-            await message.answer(f"No bookings for found")
             continue
         for booking in user_bookings:
             await message.answer(f"\nDate: {date},"
@@ -101,6 +100,9 @@ async def my_bookings(message: types.Message, state: FSMContext):
                                  f"\nNumber of seats: {booking.capacity},"
                                  f"\nBooking time: {booking.readable_booking_time},"
                                  f"\nName: {booking.user_name}")
+            no_bookings_found = False
+    if no_bookings_found:
+        await message.answer("You have no bookings")
     await state.clear()
 
 @ds.message(OrderStates.waiting_for_date_client)
@@ -259,6 +261,7 @@ async def process_cancel_reservation(message: types.Message, state: FSMContext):
     table.is_reserved = False
     table.booking_time = None
     table.user_name = None
+    table.user_id = None
     await message.answer(f"Reservation for table №{table.table_id} is cancelled")
     await state.clear()
 
@@ -338,6 +341,34 @@ async def get_id(message: types.Message):
     ids = str(message.chat.id)
     _logger.info(f"Chat id: {ids}")
     await message.answer(ids)
+
+@ds.message(Command("bookbynumber"))
+async def book_by_number(message: types.Message, state: FSMContext):
+    _logger.info("Start booking table by number")
+    if await validate_chat_id(str(message.chat.id)):
+        await message.answer("You are not allowed to use this command")
+        return
+    await message.answer("Please provide table number you want to book")
+    await state.set_state(ManagerStates.waiting_for_table_number)
+
+@ds.message(ManagerStates.waiting_for_table_number)
+async def process_table_number(message: types.Message, state: FSMContext):
+    _logger.info("Processing request for table number to book")
+    table_number = message.text
+    chosen_date = datetime.now()
+    tables = tables_storage.get_tables_for_date(chosen_date.date())
+    table = next((table for table in tables if table.table_id == int(table_number)), None)
+    if table is None:
+        await message.answer("Table with this number is not found")
+        await state.set_state(ManagerStates.waiting_for_table_number)
+        return
+    if table.is_reserved:
+        await message.answer("Table is already reserved")
+        await state.set_state(ManagerStates.waiting_for_table_number)
+        return
+    await state.update_data({"table": table})
+    await message.answer("Please provide name you want to book the table for")
+    await state.set_state(OrderStates.waiting_for_name)
 
 async def main():
     backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")

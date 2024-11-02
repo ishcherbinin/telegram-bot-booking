@@ -22,5 +22,7 @@ manager_help = f"""
 /checkbookings - check all bookings for specific date
 /checkbookingstoday - to check all bookings for today
 
+/bookbynumber - to book a table by number for today only
+
 /getid - get id of the chat
 """
