@@ -2,6 +2,8 @@ common_part = """
 This bot allows you to book table in a restaurant. 
 There are the following command allowed to use:
 
+/exit - to exit from booking process
+
 /booktable - to book a table for specific date (e.g. in the future or today)
 /booktabletoday - to book a table for today only
 

@@ -64,6 +64,11 @@ async def help_command(message: types.Message):
     else:
         await message.answer(manager_help)
 
+@ds.message(Command("exit"))
+async def exit_command(message: types.Message, state: FSMContext):
+    _logger.info("Exit command is requested")
+    await message.answer("You have exited the process")
+    await state.clear()
 
 @ds.message(Command("booktable"))
 async def book_table(message: types.Message, state: FSMContext):
@@ -92,8 +97,6 @@ async def my_bookings(message: types.Message, state: FSMContext):
     for date, bookings in all_bookings.items():
         user_bookings = [table for table in bookings
                          if table.user_id == message.from_user.username and table.is_reserved]
-        if len(user_bookings) == 0:
-            continue
         for booking in user_bookings:
             await message.answer(f"\nDate: {date},"
                                 f"\nTable №: {booking.table_id},"
