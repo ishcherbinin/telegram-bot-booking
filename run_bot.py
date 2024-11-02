@@ -162,6 +162,8 @@ async def process_name(message: types.Message, state: FSMContext):
 @ds.message(OrderStates.waiting_for_time)
 async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
+    data = await state.get_data()
+    table = data["table"]
     time = message.text
     booking_time, text = await validate_time(time)
     if booking_time is None:
@@ -169,8 +171,6 @@ async def process_time(message: types.Message, state: FSMContext):
         await state.set_state(OrderStates.waiting_for_time)
         return
     _logger.info(f"Booking time: {booking_time}")
-    data = await state.get_data()
-    table = data["table"]
     table.booking_time = booking_time
     await message.answer(f"Table for {table.capacity} seats for "
                          f"{table.user_name} at {table.readable_booking_time}")
@@ -228,8 +228,8 @@ async def confirm_booking(query: types.CallbackQuery):
     user_chat_id = booking_requests[table_id]["chat_id"]
     await bot.send_message(chat_id=user_chat_id,
                            text=f"Your booking is confirmed")
-    await bot.send_message(chat_id=user_chat_id, text=f"See you soon!")
-    await bot.send_message(chat_id=user_chat_id, text=f"To check your bookings use '/mybookings'")
+    await bot.send_message(chat_id=user_chat_id, text="See you soon!")
+    await bot.send_message(chat_id=user_chat_id, text="To check your bookings use /mybookings")
     await bot.send_message(chat_id=group_chat_id, text=f"Booking for table №{table_id} is confirmed")
     booking_requests.pop(table_id)
 
