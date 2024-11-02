@@ -27,4 +27,5 @@ manager_help = f"""
 /bookbynumber - to book a table by number for today only
 
 /getid - get id of the chat
+/backupreservations - to backup all reservations to file
 """

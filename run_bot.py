@@ -371,6 +371,15 @@ async def get_id(message: types.Message):
     _logger.info(f"Chat id: {ids}")
     await message.answer(ids)
 
+@ds.message(Command("backupreservations"))
+async def backup_reservations(message: types.Message):
+    if str(message.chat.id) in allowed_chat_ids:
+        await message.answer("You are not allowed to use this command")
+        return
+    backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")
+    tables_storage.backup_to_csv_file(backup_csv_file)
+    await message.answer("Backup is done")
+
 @ds.message(Command("bookbynumber"))
 async def book_by_number(message: types.Message, state: FSMContext):
     _logger.info("Start booking table by number")
@@ -409,7 +418,6 @@ async def main():
         _logger.exception("Error while polling")
         tables_storage.backup_to_csv_file(backup_csv_file)
         raise e
-    tables_storage.backup_to_csv_file(backup_csv_file)
 
 
 if __name__ == "__main__":
