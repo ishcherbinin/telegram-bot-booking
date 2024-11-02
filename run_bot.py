@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -86,7 +86,7 @@ async def book_table_today(message: types.Message, state: FSMContext):
     await message.answer("Please provide number of seats you need")
     chosen_date = datetime.now()
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
-    await state.set_data({"tables": tables_for_date})
+    await state.set_data({"tables": tables_for_date, "date": chosen_date})
     await state.set_state(OrderStates.waiting_for_seats)
 
 @ds.message(Command("mybookings"))
@@ -118,8 +118,8 @@ async def process_date(message: types.Message, state: FSMContext):
     if chosen_date is None:
         await state.set_state(OrderStates.waiting_for_date_client)
         return
-    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
-    await state.set_data({"tables": tables_for_date})
+    tables_for_date: Tuple[Table, ...] = tables_storage.get_tables_for_date(chosen_date.date())
+    await state.set_data({"tables": tables_for_date, "date": chosen_date})
     await message.answer("Please provide the number of seats you need")
     await state.set_state(OrderStates.waiting_for_seats)
 
@@ -163,14 +163,15 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_time(message: types.Message, state: FSMContext):
     _logger.info("Processing booking time")
     data = await state.get_data()
-    table = data["table"]
     time = message.text
-    booking_time, text = await validate_time(time)
+    target_date = data["date"]
+    booking_time, text = await validate_time(time, target_date)
     if booking_time is None:
         await message.answer(text)
         await state.set_state(OrderStates.waiting_for_time)
         return
     _logger.info(f"Booking time: {booking_time}")
+    table = data["table"]
     table.booking_time = booking_time
     await message.answer(f"Table for {table.capacity} seats for "
                          f"{table.user_name} at {table.readable_booking_time}")
@@ -264,7 +265,7 @@ async def process_number_for_reservation_cancel(message: types.Message, state: F
         await state.clear()
         return
     await message.answer(f"Please provide table number you want to cancel reservation for.")
-    if await validate_chat_id(str(message.chat.id)):
+    if not await validate_chat_id(str(message.chat.id)):
         await message.answer(f"Available tables: {[table.table_id for table in tables]}")
     await state.set_data({"tables": tables})
     await state.set_state(OrderStates.waiting_cancel_reservation)
@@ -280,9 +281,10 @@ async def process_cancel_reservation(message: types.Message, state: FSMContext):
         table = next((table for table in tables if table.table_id == int(table_number) and
                       table.user_id == user_id), None)
     else:
-        table = next((table for table in tables if table.table_id == int(table_number)), None)
+        table = next((table for table in tables if table.table_id == int(table_number) and
+                      table.is_reserved), None)
     if table is None:
-        await message.answer("Table with this number is not found")
+        await message.answer("Table with this number is not found or not reserved yet")
         await state.set_state(OrderStates.waiting_cancel_reservation)
         return
     table.is_reserved = False
