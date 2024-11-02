@@ -1,6 +1,7 @@
 import asyncio
 import logging.config
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -189,7 +190,7 @@ async def process_confirmation(message: types.Message, state: FSMContext):
         validation = await validate_chat_id(str(message.chat.id))
         if validation:
             booking_requests[table.table_id] = {"chat_id": message.chat.id, "table": table}
-            await message.answer("Table is booked. Manager will contact you soon to confirm booking")
+            await message.answer("Wait till manager confirm your booking")
             await send_request_to_chat(message, table)
     else:
         table.user_name = None
@@ -219,12 +220,16 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
 @ds.callback_query(lambda query: query.data.startswith("confirm_"))
 async def confirm_booking(query: types.CallbackQuery):
     _logger.info("Manager confirmed booking")
-    table_id = int(query.message.text.split(",")[0].split(":")[1])
+    text = query.message.text
+    match = re.search(r"Table №: (\d+)", text)
+    table_id = int(match.group(1))
     table = booking_requests[table_id]["table"]
     table.is_reserved = True
-    await bot.send_message(chat_id=booking_requests[table_id]["chat_id"],
-                           text=f"Table {table.table_id} for {table.capacity} "
-                                f"seats is booked for {table.user_name} at {table.readable_booking_time}")
+    user_chat_id = booking_requests[table_id]["chat_id"]
+    await bot.send_message(chat_id=user_chat_id,
+                           text=f"Your booking is confirmed")
+    await bot.send_message(chat_id=user_chat_id, text=f"See you soon!")
+    await bot.send_message(chat_id=user_chat_id, text=f"To check your bookings use '/mybookings'")
     await bot.send_message(chat_id=group_chat_id, text=f"Booking for table №{table_id} is confirmed")
     booking_requests.pop(table_id)
 
