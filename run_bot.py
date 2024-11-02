@@ -29,6 +29,7 @@ group_chat_id = str(os.getenv("GROUP_CHAT_ID"))
 
 dist_tables = Path(os.path.dirname(__file__))/ Path("tables_distribution") / Path(os.getenv("TABLES_FILE"))
 allowed_chat_ids = {os.getenv("ALLOWED_CHAT_IDS")} | {group_chat_id}
+backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")
 
 # create relevant objects
 tables_storage = TablesStorage.from_csv_file(Path(dist_tables))
@@ -376,7 +377,6 @@ async def backup_reservations(message: types.Message):
     if str(message.chat.id) in allowed_chat_ids:
         await message.answer("You are not allowed to use this command")
         return
-    backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")
     tables_storage.backup_to_csv_file(backup_csv_file)
     await message.answer("Backup is done")
 
@@ -409,7 +409,6 @@ async def process_table_number(message: types.Message, state: FSMContext):
     await state.set_state(OrderStates.waiting_for_name)
 
 async def main():
-    backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")
     try:
         if os.path.exists(backup_csv_file):
             tables_storage.upload_backup_file(backup_csv_file)
