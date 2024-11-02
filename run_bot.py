@@ -194,6 +194,10 @@ async def process_confirmation(message: types.Message, state: FSMContext):
             booking_requests[table.table_id] = {"chat_id": message.chat.id, "table": table}
             await message.answer("Wait till manager confirm your booking")
             await send_request_to_chat(message, table)
+        else:
+            table.is_reserved = True
+            table.user_id = message.from_user.username
+            await message.answer("Booking is confirmed")
     else:
         table.user_name = None
         table.booking_time = None
@@ -374,7 +378,7 @@ async def get_id(message: types.Message):
 
 @ds.message(Command("backupreservations"))
 async def backup_reservations(message: types.Message):
-    if str(message.chat.id) in allowed_chat_ids:
+    if str(message.chat.id) not in allowed_chat_ids:
         await message.answer("You are not allowed to use this command")
         return
     tables_storage.backup_to_csv_file(backup_csv_file)
