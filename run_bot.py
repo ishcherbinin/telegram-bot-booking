@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from logging_conf import log_config
 from restaurant_space import TablesStorage, Table
@@ -35,6 +36,7 @@ bot = Bot(token=api_token)
 storage = MemoryStorage()
 ds = Dispatcher(storage=storage)
 
+booking_requests = {}
 
 # Define the FSM states for each step
 class OrderStates(StatesGroup):
@@ -182,11 +184,11 @@ async def process_confirmation(message: types.Message, state: FSMContext):
     table = data["table"]
     confirmation = message.text.upper()
     if confirmation == "YES":
-        table.is_reserved = True
         await message.answer(f"Table {table.table_id} for {table.capacity} "
                              f"seats is booked for {table.user_name} at {table.readable_booking_time}")
         validation = await validate_chat_id(str(message.chat.id))
         if validation:
+            booking_requests[table.table_id] = {"chat_id": message.chat.id, "table": table}
             await message.answer("Table is booked. Manager will contact you soon to confirm booking")
             await send_request_to_chat(message, table)
     else:
@@ -201,13 +203,30 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
     _logger.info(f"Sending booking detail to separate chat {group_chat_id}")
     user = message.from_user.username
     table.user_id = user
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Confirm Booking", callback_data=f"confirm_")]
+        ]
+    )
     await bot.send_message(chat_id=group_chat_id,
                            text=f"\nUser name: {user} "
                                 f"\nTable №: {table.table_id},"
                                 f"\nNumber of seats: {table.capacity},"
                                 f"\nBooking time: {table.readable_booking_time},"
-                                f"\nName: {table.user_name}")
+                                f"\nName: {table.user_name}",
+                           reply_markup=keyboard)
 
+@ds.callback_query(lambda query: query.data.startswith("confirm_"))
+async def confirm_booking(query: types.CallbackQuery):
+    _logger.info("Manager confirmed booking")
+    table_id = int(query.message.text.split(",")[0].split(":")[1])
+    table = booking_requests[table_id]["table"]
+    table.is_reserved = True
+    await bot.send_message(chat_id=booking_requests[table_id]["chat_id"],
+                           text=f"Table {table.table_id} for {table.capacity} "
+                                f"seats is booked for {table.user_name} at {table.readable_booking_time}")
+    await bot.send_message(chat_id=group_chat_id, text=f"Booking for table №{table_id} is confirmed")
+    booking_requests.pop(table_id)
 
 @ds.message(Command("cancelreservation"))
 async def cancel_reservation(message: types.Message, state: FSMContext):
