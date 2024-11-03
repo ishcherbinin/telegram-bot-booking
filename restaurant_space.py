@@ -19,6 +19,9 @@ class Table:
         return (f"Table {self.table_id} with capacity {self.capacity} "
                 f"is reserved: {self.is_reserved} by {self.user_name}")
 
+    def __hash__(self):
+        return hash(f"{self.table_id}{self.booking_date}{self.booking_time}")
+
     @property
     def readable_booking_time(self) -> str:
         return self.booking_time.strftime("%H:%M")
