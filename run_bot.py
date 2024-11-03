@@ -369,9 +369,6 @@ async def get_requested_date(message: types.Message) -> Optional[datetime]:
 
 @ds.message(Command("getid"))
 async def get_id(message: types.Message):
-    if str(message.chat.id) in allowed_chat_ids:
-        await message.answer("You are not allowed to use this command")
-        return
     ids = str(message.chat.id)
     _logger.info(f"Chat id: {ids}")
     await message.answer(ids)
@@ -408,7 +405,7 @@ async def process_table_number(message: types.Message, state: FSMContext):
         await message.answer("Table is already reserved")
         await state.set_state(ManagerStates.waiting_for_table_number)
         return
-    await state.update_data({"table": table})
+    await state.update_data({"table": table, "date": chosen_date})
     await message.answer("Please provide name you want to book the table for")
     await state.set_state(OrderStates.waiting_for_name)
 

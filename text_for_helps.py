@@ -2,6 +2,7 @@ common_part = """
 This bot allows you to book table in a restaurant. 
 There are the following command allowed to use:
 
+/getid - get id of the chat
 /exit - to exit from booking process
 
 /booktable - to book a table for specific date (e.g. in the future or today)
@@ -26,6 +27,5 @@ manager_help = f"""
 
 /bookbynumber - to book a table by number for today only
 
-/getid - get id of the chat
 /backupreservations - to backup all reservations to file
 """
