@@ -10,6 +10,7 @@ class Table:
     table_id: int
     capacity: int
     is_reserved: bool = False
+    booking_date: date = None
     booking_time: datetime = None
     user_name: str = None
     user_id: str = None
@@ -23,11 +24,16 @@ class Table:
         return self.booking_time.strftime("%H:%M")
 
     @property
+    def readable_booking_date(self) -> str:
+        return self.booking_date.strftime("%d.%m.%Y")
+
+    @property
     def to_csv_row(self) -> Dict[str, str]:
         return {
             "table_id": str(self.table_id),
             "capacity": str(self.capacity),
             "is_reserved": str(self.is_reserved),
+            "booking_date": self.readable_booking_date if self.booking_date else "",
             "booking_time": self.readable_booking_time if self.booking_time else "",
             "user_name": self.user_name if self.user_name else "",
             "user_id": self.user_id if self.user_id else ""
@@ -55,7 +61,7 @@ class TablesStorage:
         """
         if business_date not in self._calendar:
             # if it is first request for this date, all tables are available
-            tables = tuple(Table(table_id=int(table_number), capacity=int(capacity))
+            tables = tuple(Table(table_id=int(table_number), capacity=int(capacity), booking_date=business_date)
                            for table_number, capacity in self._tables.items())
             self._calendar[business_date] = CalendarDate(business_date, tables)
         return self._calendar[business_date].tables
@@ -103,7 +109,8 @@ class TablesStorage:
         with open(file_path, "w", encoding="utf-8") as file:
             writer = csv.DictWriter(file,
                                     fieldnames=["date", "table_id", "capacity",
-                                                "is_reserved", "booking_time", "user_name", "user_id"])
+                                                "is_reserved", "booking_date",
+                                                "booking_time", "user_name", "user_id"])
             writer.writeheader()
             for date_info in self._calendar.values():
                 for table in date_info.tables:
@@ -123,7 +130,10 @@ class TablesStorage:
                 if business_date not in self._calendar:
                     self._calendar[business_date] = CalendarDate(business_date)
                 table = Table(table_id=int(row["table_id"]), capacity=int(row["capacity"]),
+                                booking_date=(datetime.strptime(row["booking_date"], "%d.%m.%Y").date()
+                                                if row["booking_date"] else None),
                               is_reserved=row["is_reserved"] == "True",
-                              booking_time=datetime.strptime(row["booking_time"], "%H:%M") if row["booking_time"] else None,
+                              booking_time=(datetime.strptime(row["booking_time"], "%H:%M")
+                                            if row["booking_time"] else None),
                               user_name=row["user_name"])
                 self._calendar[business_date].tables += (table,)
