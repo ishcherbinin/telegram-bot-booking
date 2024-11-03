@@ -26,6 +26,7 @@ manager_help = f"""
 /checkbookingstoday - to check all bookings for today
 
 /bookbynumber - to book a table by number for today only
+/forcebooking - to book a table for for today by number without name and time
 
 /backupreservations - to backup all reservations to file
 """

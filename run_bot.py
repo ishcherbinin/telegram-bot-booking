@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
+from faker import Faker
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -37,6 +38,7 @@ tables_storage = TablesStorage.from_csv_file(Path(dist_tables))
 bot = Bot(token=api_token)
 storage = MemoryStorage()
 ds = Dispatcher(storage=storage)
+faker = Faker()
 
 booking_requests = {}
 
@@ -54,6 +56,7 @@ class OrderStates(StatesGroup):
 class ManagerStates(StatesGroup):
     waiting_for_date_manager = State()
     waiting_for_table_number = State()
+    waiting_for_table_number_force = State()
 
 """
 This part defines common part which might be used by account or manager to book table or cancel reservation in the restaurant
@@ -381,6 +384,37 @@ async def backup_reservations(message: types.Message):
     tables_storage.backup_to_csv_file(backup_csv_file)
     await message.answer("Backup is done")
 
+@ds.message(Command("forcebooking"))
+async def book_by_number(message: types.Message, state: FSMContext):
+    _logger.info("Start booking table by number without name and time")
+    if await validate_chat_id(str(message.chat.id)):
+        await message.answer("You are not allowed to use this command")
+        return
+    await message.answer("Please provide table number you want to book")
+    await state.set_state(ManagerStates.waiting_for_table_number_force)
+
+@ds.message(ManagerStates.waiting_for_table_number_force)
+async def process_table_number(message: types.Message, state: FSMContext):
+    _logger.info("Processing request for table number to book by force")
+    table_number = message.text
+    chosen_date = datetime.now()
+    tables = tables_storage.get_tables_for_date(chosen_date.date())
+    table = next((table for table in tables if table.table_id == int(table_number)), None)
+    if table is None:
+        await message.answer("Table with this number is not found")
+        await state.set_state(ManagerStates.waiting_for_table_number_force)
+        return
+    if table.is_reserved:
+        await message.answer("Table is already reserved")
+        await state.set_state(ManagerStates.waiting_for_table_number)
+        return
+    table.is_reserved = True
+    table.user_name = faker.name()
+    table.booking_time = datetime.now().time()
+    table.user_id = message.from_user.username
+    await message.answer(f"Table {table.table_id} is booked")
+    await state.clear()
+
 @ds.message(Command("bookbynumber"))
 async def book_by_number(message: types.Message, state: FSMContext):
     _logger.info("Start booking table by number")
@@ -418,7 +452,6 @@ async def main():
         _logger.exception("Error while polling")
         tables_storage.backup_to_csv_file(backup_csv_file)
         raise e
-
 
 if __name__ == "__main__":
     asyncio.run(main())
