@@ -100,9 +100,9 @@ async def my_bookings(message: types.Message, state: FSMContext):
     if not await validate_chat_id(str(message.chat.id)):
         await message.answer("You are not allowed to use this command")
         return
-    all_bookings = tables_storage.get_all_bookings
+    all_tables = tables_storage.get_all_tables
     no_bookings_found = True
-    for date, bookings in all_bookings.items():
+    for date, bookings in all_tables.items():
         user_bookings = [table for table in bookings
                          if table.user_id == message.from_user.username and table.is_reserved]
         for booking in user_bookings:
@@ -328,6 +328,24 @@ async def validate_chat_id(chat_id: str) -> bool:
     if chat_id not in allowed_chat_ids:
         return True
     return False
+
+@ds.message(Command("allbookings"))
+async def all_bookings(message: types.Message, state: FSMContext):
+    _logger.info("Start checking all bookings")
+    if await validate_chat_id(str(message.chat.id)):
+        await message.answer("You are not allowed to use this command")
+        return
+    all_booked_tables = tables_storage.get_all_tables
+    for date, bookings in all_booked_tables.items():
+        for table in bookings:
+            if not table.is_reserved:
+                continue
+            await message.answer(f"\nDate: {date},"
+                                 f"\nTable №: {table.table_id},"
+                                 f"\nNumber of seats: {table.capacity},"
+                                 f"\nBooking time: {table.readable_booking_time},"
+                                 f"\nName: {table.user_name}")
+    await state.clear()
 
 @ds.message(Command("checkbookings"))
 async def check_bookings(message: types.Message, state: FSMContext):

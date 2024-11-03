@@ -87,7 +87,7 @@ class TablesStorage:
         return None
 
     @property
-    def get_all_bookings(self) -> Dict[date, Tuple[Table, ...]]:
+    def get_all_tables(self) -> Dict[date, Tuple[Table, ...]]:
         return {date_info.business_date: date_info.tables for date_info in self._calendar.values()}
 
     @classmethod
