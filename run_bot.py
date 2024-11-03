@@ -106,7 +106,7 @@ async def my_bookings(message: types.Message, state: FSMContext):
         user_bookings = [table for table in bookings
                          if table.user_id == message.from_user.username and table.is_reserved]
         for booking in user_bookings:
-            await message.answer(f"\nDate: {date},"
+            await message.answer(f"\nDate: {booking.readable_booking_date},"
                                 f"\nTable №: {booking.table_id},"
                                  f"\nNumber of seats: {booking.capacity},"
                                  f"\nBooking time: {booking.readable_booking_time},"
@@ -340,7 +340,7 @@ async def all_bookings(message: types.Message, state: FSMContext):
         for table in bookings:
             if not table.is_reserved:
                 continue
-            await message.answer(f"\nDate: {date},"
+            await message.answer(f"\nDate: {table.readable_booking_date},"
                                  f"\nTable №: {table.table_id},"
                                  f"\nNumber of seats: {table.capacity},"
                                  f"\nBooking time: {table.readable_booking_time},"
