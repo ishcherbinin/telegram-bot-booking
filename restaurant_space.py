@@ -126,6 +126,7 @@ class TablesStorage:
         :param file:
         :return:
         """
+        hashes = []
         with open(file, "r", encoding="utf-8") as file:
             reader = csv.DictReader(file)
             for row in reader:
@@ -139,4 +140,7 @@ class TablesStorage:
                               booking_time=(datetime.strptime(row["booking_time"], "%H:%M")
                                             if row["booking_time"] else None),
                               user_name=row["user_name"])
-                self._calendar[business_date].tables += (table,)
+                tb_hash = hash(table)
+                if tb_hash not in hashes:
+                    hashes.append(tb_hash)
+                    self._calendar[business_date].tables += (table,)
