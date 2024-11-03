@@ -17,6 +17,8 @@ customer_help = f"""
 {common_part}
 
 /mybookings - to check all your bookings
+
+/customerrequest - to request send a request to manager directly, simple message
 """
 
 manager_help = f"""

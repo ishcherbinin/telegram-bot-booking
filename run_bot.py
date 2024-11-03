@@ -51,6 +51,7 @@ class OrderStates(StatesGroup):
     waiting_for_confirmation = State()
     wait_for_number_for_cancel = State()
     waiting_cancel_reservation = State()
+    waiting_for_request_message = State()
 
 
 class ManagerStates(StatesGroup):
@@ -113,6 +114,21 @@ async def my_bookings(message: types.Message, state: FSMContext):
             no_bookings_found = False
     if no_bookings_found:
         await message.answer("You have no bookings")
+    await state.clear()
+
+@ds.message(Command("customerrequest"))
+async def customer_request(message: types.Message, state: FSMContext):
+    _logger.info("Start customer request")
+    await message.answer("Please provide your request")
+    await state.set_state(OrderStates.waiting_for_request_message)
+
+@ds.message(OrderStates.waiting_for_request_message)
+async def process_request(message: types.Message, state: FSMContext):
+    _logger.info("Processing customer request")
+    request = message.text
+    await bot.send_message(chat_id=group_chat_id,
+                           text=f"Request from user '{message.from_user.username}': {request}")
+    await message.answer("Your request is sent to manager")
     await state.clear()
 
 @ds.message(OrderStates.waiting_for_date_client)
