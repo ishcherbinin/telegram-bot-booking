@@ -11,6 +11,9 @@ There are the following command allowed to use:
 NOTE. you need a table number for these commands
 /cancelreservation - to cancel reservation for a table (for any date). 
 /cancelreservationtoday- to cancel reservation for a table for today only.
+
+/availabletables - to check available tables for specific date
+/availabletablestoday - to check available tables for today only
 """
 
 customer_help = f"""

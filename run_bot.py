@@ -28,7 +28,7 @@ api_token = os.getenv("TELEGRAM_API_TOKEN")
 
 group_chat_id = str(os.getenv("GROUP_CHAT_ID"))
 
-dist_tables = Path(os.path.dirname(__file__))/ Path("tables_distribution") / Path(os.getenv("TABLES_FILE"))
+dist_tables = Path(os.path.dirname(__file__)) / Path("tables_distribution") / Path(os.getenv("TABLES_FILE"))
 allowed_chat_ids = {os.getenv("ALLOWED_CHAT_IDS")} | {group_chat_id}
 backup_csv_file = Path(os.path.dirname(__file__)) / Path("./backup_tables.csv")
 
@@ -42,6 +42,7 @@ faker = Faker()
 
 booking_requests = {}
 
+
 # Define the FSM states for each step
 class OrderStates(StatesGroup):
     waiting_for_seats = State()
@@ -52,6 +53,7 @@ class OrderStates(StatesGroup):
     wait_for_number_for_cancel = State()
     waiting_cancel_reservation = State()
     waiting_for_request_message = State()
+    waiting_for_date_for_availability = State()
 
 
 class ManagerStates(StatesGroup):
@@ -59,10 +61,32 @@ class ManagerStates(StatesGroup):
     waiting_for_table_number = State()
     waiting_for_table_number_force = State()
 
+
+"""
+Part with utility functions for bot
+"""
+async def print_table(table: Table, message: types.Message) -> None:
+    await message.answer(f"\nDate: {table.readable_booking_date},"
+                         f"\nTable №: {table.table_id},"
+                         f"\nNumber of seats: {table.capacity},"
+                         f"\nBooking time: {table.readable_booking_time},"
+                         f"\nName: {table.user_name}")
+
+
+async def get_requested_date(message: types.Message) -> Optional[datetime]:
+    date = message.text
+    chosen_date, text = await validate_date(date)
+    if chosen_date is None:
+        await message.answer(text)
+        return
+    return chosen_date
+
+
 """
 This part defines common part which might be used by account or manager to book table or cancel reservation in the restaurant
 Open chat with bot and type /book-table to start booking process
 """
+
 
 @ds.message(Command(commands=["help", "start"]))
 async def help_command(message: types.Message):
@@ -72,11 +96,53 @@ async def help_command(message: types.Message):
     else:
         await message.answer(manager_help)
 
+
 @ds.message(Command("exit"))
 async def exit_command(message: types.Message, state: FSMContext):
     _logger.info("Exit command is requested")
     await message.answer("You have exited the process")
     await state.clear()
+
+@ds.message(Command("availabletables"))
+async def available_tables(message: types.Message, state: FSMContext):
+    _logger.info("Available tables command is requested")
+    await message.answer("Please provide date you want to check availability for. Format: DD.MM")
+    await state.set_state(OrderStates.waiting_for_date_for_availability)
+
+@ds.message(Command("availabletablestoday"))
+async def available_tables_today(message: types.Message, state: FSMContext):
+    _logger.info("Available tables for today command is requested")
+    chosen_date = datetime.now()
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    free_tables = [table for table in tables_for_date if not table.is_reserved]
+    if not free_tables:
+        await message.answer("There are no available tables for today")
+        return
+    for table in free_tables:
+        await message.answer(f"Available table for today: "
+                             f"\nID: {table.table_id}"
+                             f"\nNumber of seats: {table.capacity}")
+    await state.clear()
+
+@ds.message(OrderStates.waiting_for_date_for_availability)
+async def process_date_for_availability(message: types.Message, state: FSMContext):
+    _logger.info("Processing request particular date for checking availability")
+    chosen_date = await get_requested_date(message)
+    if chosen_date is None:
+        await state.set_state(OrderStates.waiting_for_date_for_availability)
+        return
+    tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
+    free_tables = [table for table in tables_for_date if not table.is_reserved]
+    if not free_tables:
+        await message.answer("There are no available tables for this date")
+        await state.clear()
+        return
+    for table in free_tables:
+        await message.answer(f"Available table for {chosen_date.date()}: "
+                             f"\nID: {table.table_id}"
+                             f"\nNumber of seats: {table.capacity}")
+    await state.clear()
+
 
 @ds.message(Command("booktable"))
 async def book_table(message: types.Message, state: FSMContext):
@@ -84,6 +150,7 @@ async def book_table(message: types.Message, state: FSMContext):
     _logger.debug(message)
     await message.answer("Please provide date you want to reserve table for. Format: DD.MM")
     await state.set_state(OrderStates.waiting_for_date_client)
+
 
 @ds.message(Command("booktabletoday"))
 async def book_table_today(message: types.Message, state: FSMContext):
@@ -93,6 +160,7 @@ async def book_table_today(message: types.Message, state: FSMContext):
     tables_for_date = tables_storage.get_tables_for_date(chosen_date.date())
     await state.set_data({"tables": tables_for_date, "date": chosen_date})
     await state.set_state(OrderStates.waiting_for_seats)
+
 
 @ds.message(Command("mybookings"))
 async def my_bookings(message: types.Message, state: FSMContext):
@@ -106,21 +174,19 @@ async def my_bookings(message: types.Message, state: FSMContext):
         user_bookings = [table for table in bookings
                          if table.user_id == message.from_user.username and table.is_reserved]
         for booking in user_bookings:
-            await message.answer(f"\nDate: {booking.readable_booking_date},"
-                                f"\nTable №: {booking.table_id},"
-                                 f"\nNumber of seats: {booking.capacity},"
-                                 f"\nBooking time: {booking.readable_booking_time},"
-                                 f"\nName: {booking.user_name}")
+            await print_table(booking, message)
             no_bookings_found = False
     if no_bookings_found:
         await message.answer("You have no bookings")
     await state.clear()
+
 
 @ds.message(Command("customerrequest"))
 async def customer_request(message: types.Message, state: FSMContext):
     _logger.info("Start customer request")
     await message.answer("Please provide your request")
     await state.set_state(OrderStates.waiting_for_request_message)
+
 
 @ds.message(OrderStates.waiting_for_request_message)
 async def process_request(message: types.Message, state: FSMContext):
@@ -130,6 +196,7 @@ async def process_request(message: types.Message, state: FSMContext):
                            text=f"Request from user '{message.from_user.username}': {request}")
     await message.answer("Your request is sent to manager")
     await state.clear()
+
 
 @ds.message(OrderStates.waiting_for_date_client)
 async def process_date(message: types.Message, state: FSMContext):
@@ -242,6 +309,7 @@ async def send_request_to_chat(message: types.Message, table: Table) -> None:
                                 f"\nName: {table.user_name}",
                            reply_markup=keyboard)
 
+
 @ds.callback_query(lambda query: query.data.startswith("confirm_"))
 async def confirm_booking(query: types.CallbackQuery):
     _logger.info("Manager confirmed booking")
@@ -258,11 +326,13 @@ async def confirm_booking(query: types.CallbackQuery):
     await bot.send_message(chat_id=group_chat_id, text=f"Booking for table №{table_id} is confirmed")
     booking_requests.pop(table_id)
 
+
 @ds.message(Command("cancelreservation"))
 async def cancel_reservation(message: types.Message, state: FSMContext):
     _logger.info("Start cancelling reservation")
     await message.answer("Please provide date you want to cancel reservation for. Format: DD.MM")
     await state.set_state(OrderStates.wait_for_number_for_cancel)
+
 
 @ds.message(Command("cancelreservationtoday"))
 async def cancel_reservation_today(message: types.Message, state: FSMContext):
@@ -272,6 +342,7 @@ async def cancel_reservation_today(message: types.Message, state: FSMContext):
     await state.set_data({"tables": tables_for_date})
     await message.answer("Please provide table number you want to cancel reservation for.")
     await state.set_state(OrderStates.waiting_cancel_reservation)
+
 
 @ds.message(OrderStates.wait_for_number_for_cancel)
 async def process_number_for_reservation_cancel(message: types.Message, state: FSMContext):
@@ -293,6 +364,7 @@ async def process_number_for_reservation_cancel(message: types.Message, state: F
         await message.answer(f"Available tables: {[table.table_id for table in tables]}")
     await state.set_data({"tables": tables})
     await state.set_state(OrderStates.waiting_cancel_reservation)
+
 
 @ds.message(OrderStates.waiting_cancel_reservation)
 async def process_cancel_reservation(message: types.Message, state: FSMContext):
@@ -318,9 +390,11 @@ async def process_cancel_reservation(message: types.Message, state: FSMContext):
     await message.answer(f"Reservation for table №{table.table_id} is cancelled")
     await state.clear()
 
+
 """
 This part defines manager oriented part which might be used by manager to check bookings
 """
+
 
 async def validate_chat_id(chat_id: str) -> bool:
     _logger.debug(f"Chat id: {chat_id}")
@@ -328,6 +402,7 @@ async def validate_chat_id(chat_id: str) -> bool:
     if chat_id not in allowed_chat_ids:
         return True
     return False
+
 
 @ds.message(Command("allbookings"))
 async def all_bookings(message: types.Message, state: FSMContext):
@@ -340,12 +415,9 @@ async def all_bookings(message: types.Message, state: FSMContext):
         for table in bookings:
             if not table.is_reserved:
                 continue
-            await message.answer(f"\nDate: {table.readable_booking_date},"
-                                 f"\nTable №: {table.table_id},"
-                                 f"\nNumber of seats: {table.capacity},"
-                                 f"\nBooking time: {table.readable_booking_time},"
-                                 f"\nName: {table.user_name}")
+            await print_table(table, message)
     await state.clear()
+
 
 @ds.message(Command("checkbookings"))
 async def check_bookings(message: types.Message, state: FSMContext):
@@ -370,11 +442,9 @@ async def check_bookings_today(message: types.Message, state: FSMContext):
         await message.answer("There are no bookings for today")
         return
     for table in tables:
-        await message.answer(f"Table №: {table.table_id},"
-                             f"\nNumber of seats: {table.capacity},"
-                             f"\nBooking time: {table.readable_booking_time},"
-                             f"\nName: {table.user_name}")
+        await print_table(table, message)
     await state.clear()
+
 
 @ds.message(ManagerStates.waiting_for_date_manager)
 async def process_date_manager(message: types.Message, state: FSMContext):
@@ -390,25 +460,16 @@ async def process_date_manager(message: types.Message, state: FSMContext):
         await state.clear()
         return
     for table in tables:
-        await message.answer(f"Table №: {table.table_id},"
-                             f"\nNumber of seats: {table.capacity},"
-                             f"\nBooking time: {table.readable_booking_time},"
-                             f"\nName: {table.user_name}")
+        await print_table(table, message)
     await state.clear()
 
-async def get_requested_date(message: types.Message) -> Optional[datetime]:
-    date = message.text
-    chosen_date, text = await validate_date(date)
-    if chosen_date is None:
-        await message.answer(text)
-        return
-    return chosen_date
 
 @ds.message(Command("getid"))
 async def get_id(message: types.Message):
     ids = str(message.chat.id)
     _logger.info(f"Chat id: {ids}")
     await message.answer(ids)
+
 
 @ds.message(Command("backupreservations"))
 async def backup_reservations(message: types.Message):
@@ -418,6 +479,7 @@ async def backup_reservations(message: types.Message):
     tables_storage.backup_to_csv_file(backup_csv_file)
     await message.answer("Backup is done")
 
+
 @ds.message(Command("forcebooking"))
 async def book_by_number(message: types.Message, state: FSMContext):
     _logger.info("Start booking table by number without name and time")
@@ -426,6 +488,7 @@ async def book_by_number(message: types.Message, state: FSMContext):
         return
     await message.answer("Please provide table number you want to book")
     await state.set_state(ManagerStates.waiting_for_table_number_force)
+
 
 @ds.message(ManagerStates.waiting_for_table_number_force)
 async def process_table_number(message: types.Message, state: FSMContext):
@@ -440,7 +503,7 @@ async def process_table_number(message: types.Message, state: FSMContext):
         return
     if table.is_reserved:
         await message.answer("Table is already reserved")
-        await state.set_state(ManagerStates.waiting_for_table_number)
+        await state.set_state(ManagerStates.waiting_for_table_number_force)
         return
     table.is_reserved = True
     table.user_name = faker.name()
@@ -448,6 +511,7 @@ async def process_table_number(message: types.Message, state: FSMContext):
     table.user_id = message.from_user.username
     await message.answer(f"Table {table.table_id} is booked")
     await state.clear()
+
 
 @ds.message(Command("bookbynumber"))
 async def book_by_number(message: types.Message, state: FSMContext):
@@ -457,6 +521,7 @@ async def book_by_number(message: types.Message, state: FSMContext):
         return
     await message.answer("Please provide table number you want to book")
     await state.set_state(ManagerStates.waiting_for_table_number)
+
 
 @ds.message(ManagerStates.waiting_for_table_number)
 async def process_table_number(message: types.Message, state: FSMContext):
@@ -477,6 +542,7 @@ async def process_table_number(message: types.Message, state: FSMContext):
     await message.answer("Please provide name you want to book the table for")
     await state.set_state(OrderStates.waiting_for_name)
 
+
 async def main():
     try:
         if os.path.exists(backup_csv_file):
@@ -486,6 +552,7 @@ async def main():
         _logger.exception("Error while polling")
         tables_storage.backup_to_csv_file(backup_csv_file)
         raise e
+
 
 if __name__ == "__main__":
     asyncio.run(main())
