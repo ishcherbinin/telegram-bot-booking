@@ -24,7 +24,7 @@ class Table:
 
     @property
     def readable_booking_time(self) -> str:
-        return self.booking_time.strftime("%H:%M")
+        return self.booking_time.strftime("%H:%M") if self.booking_time != "N/A" else self.booking_time
 
     @property
     def readable_booking_date(self) -> str:
