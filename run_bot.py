@@ -507,7 +507,7 @@ async def process_table_number(message: types.Message, state: FSMContext):
         return
     table.is_reserved = True
     table.user_name = faker.name()
-    table.booking_time = datetime.now().time()
+    table.booking_time = "N/A"
     table.user_id = message.from_user.username
     await message.answer(f"Table {table.table_id} is booked")
     await state.clear()
